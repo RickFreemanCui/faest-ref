@@ -7,9 +7,11 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "compat.h"
 #include "macros.h"
+#include "instances.h"
 
 FAEST_BEGIN_C_DECL
 
@@ -27,21 +29,19 @@ static inline void masked_xor_u8_array(const uint8_t* a, const uint8_t* b, uint8
   }
 }
 
-ATTR_CONST ATTR_ALWAYS_INLINE inline uint8_t get_bit(uint8_t in, uint8_t index) {
-  return (in >> index) & 0x01;
-}
+#define get_bit(value, index) (((value) >> (index)) & 1)
+#define set_bit(value, index) ((value) << (index))
+#define ptr_get_bit(value, index) (((value)[(index) / 8] >> ((index) % 8)) & 1)
+#define ptr_set_bit(dst, index, value)                                                             \
+  do {                                                                                             \
+    const unsigned int ptr_set_bit_index_mod_8 = (index) % 8;                                      \
+    (dst)[(index) / 8] = ((dst)[(index) / 8] & ~(1 << ptr_set_bit_index_mod_8)) |                  \
+                         ((value) << ptr_set_bit_index_mod_8);                                     \
+  } while (0)
 
-ATTR_CONST ATTR_ALWAYS_INLINE inline uint8_t set_bit(uint8_t in, uint8_t index) {
-  return (in << index);
-}
-
-ATTR_PURE ATTR_ALWAYS_INLINE inline uint8_t ptr_get_bit(const uint8_t* in, unsigned int index) {
-  return (in[index / 8] >> (index % 8)) & 1;
-}
-
-ATTR_ALWAYS_INLINE inline void ptr_set_bit(uint8_t* dst, uint8_t in, unsigned int index) {
-  dst[index / 8] |= in << (index % 8);
-}
+// DecodeAllChall_3
+bool decode_all_chall_3(uint16_t* decoded_chall, const uint8_t* chall,
+                        const faest_paramset_t* params);
 
 FAEST_END_C_DECL
 

@@ -22,7 +22,6 @@ libfaest_256s = static_library('faest_256s',
   include_directories: include_directories,
   c_args: defines + c_flags
 )
-install_headers(headers, subdir: 'faest_256s')
 libfaest_256s_dependency = declare_dependency(
   link_with: libfaest_256s,
   include_directories: include_directories
@@ -38,16 +37,18 @@ if openssl.found()
     include_directories: include_directories,
     c_args: defines + c_flags + ['-DHAVE_RANDOMBYTES'],
     cpp_args: defines + cpp_flags + ['-DHAVE_RANDOMBYTES'],
+    link_args: linker_flags,
     override_options: ['b_lto=false'],
   )
 endif
-if boost_program_options.found()
+if boost_program_options.found() and get_option('benchmarks').enabled()
   bench_sources = files(join_paths(meson.project_source_root(), 'tools', 'bench.cpp'))
   bench = executable('faest_256s_bench', bench_sources,
-    dependencies: [libfaest_256s_dependency, boost_program_options],
+    dependencies: [libfaest_256s_dependency, boost_program_options, threads],
     include_directories: include_directories,
     c_args: defines + c_flags,
-    cpp_args: defines + cpp_flags
+    cpp_args: defines + cpp_flags,
+    link_args: linker_flags
   )
 endif
 test_sources = files(join_paths(meson.project_source_root(), 'tests', 'api_test.c'))
@@ -55,6 +56,7 @@ faest_256s_test = executable('faest_256s_api_test', test_sources,
   dependencies: [libfaest_256s_dependency, valgrind],
   include_directories: include_directories,
   c_args: defines + c_flags + valgrind_defines,
+  link_args: linker_flags,
   override_options: ['b_lto=false'],
 )
 test('faest_256s_api_test', faest_256s_test,
@@ -76,7 +78,7 @@ if valgrind_exec.found()
     build_by_default: false,
   )
 endif
-if get_option('benchmarks').enabled()
+if get_option('catch2').enabled() and get_option('benchmarks').enabled()
   bench_sources = files(
     join_paths(meson.project_source_root(), 'tools', 'bench_c2.cpp'),
   )
@@ -84,6 +86,7 @@ if get_option('benchmarks').enabled()
     dependencies: [libfaest_256s_dependency, boost_program_options, catch2],
     include_directories: include_directories,
     c_args: defines + c_flags,
-    cpp_args: defines + cpp_flags
+    cpp_args: defines + cpp_flags,
+    link_args: linker_flags
   )
 endif

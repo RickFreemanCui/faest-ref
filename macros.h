@@ -5,6 +5,8 @@
 #ifndef FAEST_MACROS_H
 #define FAEST_MACROS_H
 
+#include "faest_defines.h"
+
 /* compatibility with clang and other compilers */
 #if !defined(__has_attribute)
 #define __has_attribute(a) 0
@@ -14,12 +16,23 @@
 #define __has_builtin(b) 0
 #endif
 
+#if !defined(__has_include)
+#define __has_include(h) 0
+#endif
+
 /* gcc version check macro */
 #if defined(__GNUC__) && defined(__GNUC_MINOR__)
 #define GNUC_CHECK(maj, min)                                                                       \
   (((__GNUC__ << 20) + (__GNUC_MINOR__ << 10)) >= (((maj) << 20) + ((min) << 10)))
 #else
 #define GNUC_CHECK(maj, min) 0
+#endif
+
+/* clang version check macro */
+#if defined(__clang__) && defined(__clang_major__)
+#define CLANG_CHECK(maj) (__clang_major__ >= (maj))
+#else
+#define CLANG_CHECK(maj) 0
 #endif
 
 /* glibc version check macro */
@@ -39,7 +52,7 @@
 /* NetBSD version check macro */
 #if defined(__NetBSD__)
 #include <sys/param.h>
-#define NETBSD_CHECK(maj, min) (__NetBSD_Version__ >= ((maj)*1000000000 + (min)*10000000))
+#define NETBSD_CHECK(maj, min) (__NetBSD_Version__ >= ((maj) * 1000000000 + (min) * 10000000))
 #else
 #define NETBSD_CHECK(maj, min) 0
 #endif
@@ -48,7 +61,7 @@
 #if defined(__APPLE__)
 #include <Availability.h>
 #define MACOSX_CHECK(maj, min, rev)                                                                \
-  (__MAC_OS_X_VERSION_MIN_REQUIRED >= ((maj)*10000 + (min)*100 + (rev)))
+  (__MAC_OS_X_VERSION_MIN_REQUIRED >= ((maj) * 10000 + (min) * 100 + (rev)))
 #else
 #define MACOSX_CHECK(maj, min, rev) 0
 #endif
@@ -59,14 +72,6 @@
 
 #if !defined(MAX)
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-#if defined(__cplusplus)
-#define FAEST_BEGIN_C_DECL extern "C" {
-#define FAEST_END_C_DECL }
-#else
-#define FAEST_BEGIN_C_DECL
-#define FAEST_END_C_DECL
 #endif
 
 /* assume */
@@ -164,8 +169,8 @@
 #define ATTR_PURE
 #endif
 
-/* constr attribute
-  Functions can be marked as pure if their only effect is their return value. The return value
+/* const attribute
+  Functions can be marked as const if their only effect is their return value. The return value
   itself may only be computed from the arguments.
  */
 #if defined(__GNUC__) || __has_attribute(const)
@@ -179,10 +184,14 @@
 #define ATTR_TARGET(x) __attribute__((target((x))))
 #define ATTR_TARGET_AVX2 __attribute__((target("avx2,bmi2,sse2")))
 #define ATTR_TARGET_SSE2 __attribute__((target("sse2")))
+#define ATTR_TARGET_AESNI __attribute__((target("sse2,aes")))
+#define ATTR_TARGET_AESNI_AVX2 __attribute__((target("avx2,bmi2,aes")))
 #else
 #define ATTR_TARGET(x)
 #define ATTR_TARGET_AVX2
 #define ATTR_TARGET_SSE2
+#define ATTR_TARGET_AESNI
+#define ATTR_TARGET_AESNI_AVX2
 #endif
 
 /* artificial attribute */
@@ -193,7 +202,11 @@
 #endif
 
 /* vector_size attribute */
-#if GNUC_CHECK(4, 8) || __has_attribute(__vector_size__)
+#if GNUC_CHECK(4, 8) || __has_attribute(vector_size)
+#define HAVE_ATTR_VECTOR_SIZE
+#define ATTR_VECTOR_SIZE(s) __attribute__((vector_size(s)))
+#elif __has_attribute(__vector_size__)
+#define HAVE_ATTR_VECTOR_SIZE
 #define ATTR_VECTOR_SIZE(s) __attribute__((__vector_size__(s)))
 #else
 #define ATTR_VECTOR_SIZE(s)
@@ -220,6 +233,13 @@
 #define ATTR_ALLOC_SIZE(arg) __attribute__((alloc_size(arg)))
 #else
 #define ATTR_ALLOC_SIZE(arg)
+#endif
+
+/* deprecated attribute */
+#if defined(_GCC__) || __has_attribute(deprecated)
+#define ATTR_DEPRECATED __attribute__((deprecated))
+#else
+#define ATTR_DEPRECATED
 #endif
 
 /* concatenation */

@@ -14,7 +14,7 @@
 #include <stddef.h>
 
 #if !defined(HAVE_CONFIG_H) && !defined(OQS)
-/* In case cmake checks were not run, define HAVE_* for known good configurations. We skip those if
+/* In case meson checks were not run, define HAVE_* for known good configurations. We skip those if
  * building for OQS, as the compat functions from there can be used instead. */
 #if defined(__OpenBSD__)
 #include <sys/param.h>
@@ -40,6 +40,19 @@
 /* timingsafe_bcmp was introduced in OpenBSD 4.9, FreeBSD 12.0, and MacOS X 10.12 */
 #define HAVE_TIMINGSAFE_BCMP
 #endif /* HAVE_TIMINGSAFE_BCMP */
+
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_IX86) || defined(_M_AMD64)
+#if __has_include(<wmmintrin.h>)
+#define HAVE_AESNI
+#endif
+#if __has_include(<immintrin.h>)
+#define HAVE_AVX2
+#endif
+
+#if GNUC_CHECK(9, 0) || CLANG_CHECK(8)
+#define HAVE_MM_LOADU_SI64
+#endif
+#endif
 #endif /* !HAVE_CONFIG_H && !OQS */
 
 #if defined(HAVE_ALIGNED_ALLOC)
@@ -97,28 +110,16 @@ FAEST_END_C_DECL
 #endif /* HAVE_EXPLICIT_BZERO */
 
 #if defined(OQS)
+#include <oqs/common.h>
+
 #define faest_aligned_alloc(alignment, size) OQS_MEM_aligned_alloc((alignment), (size))
 #define faest_aligned_free(ptr) OQS_MEM_aligned_free((ptr))
 #define faest_timingsafe_bcmp(a, b, len) OQS_MEM_secure_bcmp((a), (b), (len))
 #define faest_explicit_bzero(ptr, len) OQS_MEM_cleanse(ptr, len)
 #endif
 
-/* helper macros/functions for checked integer subtraction */
-#if GNUC_CHECK(5, 0) || __has_builtin(__builtin_add_overflow)
-#define sub_overflow_size_t(x, y, diff) __builtin_sub_overflow(x, y, diff)
-#else
-#include <stdbool.h>
-#include <stddef.h>
-
-ATTR_ARTIFICIAL
-static inline bool sub_overflow_size_t(const size_t x, const size_t y, size_t* diff) {
-  *diff = x - y;
-  return x < y;
-}
-#endif
-
-#include <stdint.h>
 #include <limits.h>
+#include <stdint.h>
 
 /* helper functions for left and right rotations of bytes */
 #if GNUC_CHECK(4, 9) && (defined(__x86_64__) || defined(__i386__))
@@ -126,6 +127,13 @@ static inline bool sub_overflow_size_t(const size_t x, const size_t y, size_t* d
 
 #define rotl8 __rolb
 #define rotr8 __rorb
+#define rotl32 __rold
+#define rotr32 __rord
+#elif __has_builtin(__builtin_rotateleft) && __has_builtin(__builtin_rotateright)
+#define rotl8 __builtin_rotateleft8
+#define rotr8 __builtin_rotateright8
+#define rotl32 __builtin_rotateleft32
+#define rotr32 __builtin_rotateright32
 #else
 ATTR_CONST static inline uint8_t rotl8(uint8_t n, unsigned int c) {
   const unsigned int mask = (CHAR_BIT * sizeof(n) - 1);
@@ -138,62 +146,34 @@ ATTR_CONST static inline uint8_t rotr8(uint8_t n, unsigned int c) {
   c &= mask;
   return (n >> c) | (n << ((-c) & mask));
 }
+
+ATTR_CONST static inline uint32_t rotl32(uint32_t n, unsigned int c) {
+  const unsigned int mask = (CHAR_BIT * sizeof(n) - 1);
+  c &= mask;
+  return (n << c) | (n >> ((-c) & mask));
+}
+
+ATTR_CONST static inline uint32_t rotr32(uint32_t n, unsigned int c) {
+  const unsigned int mask = (CHAR_BIT * sizeof(n) - 1);
+  c &= mask;
+  return (n >> c) | (n << ((-c) & mask));
+}
 #endif
 
-/* helper functions to compute number of leading zeroes */
-#if GNUC_CHECK(4, 7) || __has_builtin(__builtin_clz)
-ATTR_CONST ATTR_ARTIFICIAL static inline uint32_t clz(uint32_t x) {
-  return x ? __builtin_clz(x) : 32;
-}
-#elif defined(_MSC_VER)
-#include <intrin.h>
-ATTR_CONST ATTR_ARTIFICIAL static inline uint32_t clz(uint32_t x) {
-  unsigned long index = 0;
-  if (_BitScanReverse(&index, x)) {
-    return 31 - index;
-  }
-  return 32;
-}
+/* helper functions for byte parity: 0 if even number of bits are set, 1 if odd number of bts are
+ * set */
+#if __has_builtin(__builtin_parity)
+#define parity8 __builtin_parity
+#elif __has_builtin(__builtin_popcount)
+#define parity8(x) (__builtin_popcount(x) & 0x1)
 #else
-/* Number of leading zeroes of x.
- * From the book
- * H.S. Warren, *Hacker's Delight*, Pearson Education, 2003.
- * http://www.hackersdelight.org/hdcodetxt/nlz.c.txt
- */
-ATTR_CONST ATTR_ARTIFICIAL static inline uint32_t clz(uint32_t x) {
-  if (!x) {
-    return 32;
-  }
-
-  uint32_t n = 1;
-  if (!(x >> 16)) {
-    n = n + 16;
-    x = x << 16;
-  }
-  if (!(x >> 24)) {
-    n = n + 8;
-    x = x << 8;
-  }
-  if (!(x >> 28)) {
-    n = n + 4;
-    x = x << 4;
-  }
-  if (!(x >> 30)) {
-    n = n + 2;
-    x = x << 2;
-  }
-  n = n - (x >> 31);
-
-  return n;
+ATTR_CONST ATTR_ARTIFICIAL static inline uint8_t parity8(uint8_t n) {
+  n ^= n >> 4;
+  n ^= n >> 2;
+  n ^= n >> 1;
+  return !((~n) & 1);
 }
 #endif
-
-ATTR_CONST ATTR_ARTIFICIAL static inline uint32_t ceil_log2(uint32_t x) {
-  if (!x) {
-    return 0;
-  }
-  return 32 - clz(x - 1);
-}
 
 #if !defined(__cplusplus)
 #include <assert.h>
@@ -203,5 +183,37 @@ ATTR_CONST ATTR_ARTIFICIAL static inline uint32_t ceil_log2(uint32_t x) {
 #define static_assert _Static_assert
 #endif
 #endif
+
+#if defined(HAVE_AESNI)
+#if defined(_MSC_VER)
+// workarounds for MSVC
+#include <immintrin.h>
+
+#define __m128i_u __m128i
+#elif !GNUC_CHECK(7, 0) && !CLANG_CHECK(9)
+// workaround for gcc and clang
+#define __m128i_u __m128i
+#endif
+
+#if !defined(HAVE_MM_LOADU_SI64)
+#include <string.h>>
+
+ATTR_TARGET_SSE2 ATTR_ALWAYS_INLINE static inline __m128i _mm_loadu_si64(const void* src) {
+  uint64_t u0;
+  memcpy(&u0, src, sizeof(u0));
+#if !defined(_MSC_VER) || defined(__x86_64__)
+  return _mm_set_epi64x(0, u0);
+#else
+  // MS VC for x86 (untested)
+  union {
+    uint64_t q;
+    uint32_t r[2];
+  } u;
+  u.q = u0;
+  return _mm_setr_epi32(u.r[0], u.r[1], 0, 0);
+#endif
+}
+#endif /* !HAVE_MM_LOADU_SI64 */
+#endif /* HAVE_AESNI */
 
 #endif

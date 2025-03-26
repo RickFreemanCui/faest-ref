@@ -43,7 +43,6 @@ libfaest_{param_name} = static_library('faest_{param_name}',
   include_directories: include_directories,
   c_args: defines + c_flags
 )
-install_headers(headers, subdir: 'faest_{param_name}')
 libfaest_{param_name}_dependency = declare_dependency(
   link_with: libfaest_{param_name},
   include_directories: include_directories
@@ -59,16 +58,18 @@ if openssl.found()
     include_directories: include_directories,
     c_args: defines + c_flags + ['-DHAVE_RANDOMBYTES'],
     cpp_args: defines + cpp_flags + ['-DHAVE_RANDOMBYTES'],
+    link_args: linker_flags,
     override_options: ['b_lto=false'],
   )
 endif
-if boost_program_options.found()
+if boost_program_options.found() and get_option('benchmarks').enabled()
   bench_sources = files(join_paths(meson.project_source_root(), 'tools', 'bench.cpp'))
   bench = executable('faest_{param_name}_bench', bench_sources,
-    dependencies: [libfaest_{param_name}_dependency, boost_program_options],
+    dependencies: [libfaest_{param_name}_dependency, boost_program_options, threads],
     include_directories: include_directories,
     c_args: defines + c_flags,
-    cpp_args: defines + cpp_flags
+    cpp_args: defines + cpp_flags,
+    link_args: linker_flags
   )
 endif
 test_sources = files(join_paths(meson.project_source_root(), 'tests', 'api_test.c'))
@@ -76,6 +77,7 @@ faest_{param_name}_test = executable('faest_{param_name}_api_test', test_sources
   dependencies: [libfaest_{param_name}_dependency, valgrind],
   include_directories: include_directories,
   c_args: defines + c_flags + valgrind_defines,
+  link_args: linker_flags,
   override_options: ['b_lto=false'],
 )
 test('faest_{param_name}_api_test', faest_{param_name}_test,
@@ -97,7 +99,7 @@ if valgrind_exec.found()
     build_by_default: false,
   )
 endif
-if get_option('benchmarks').enabled()
+if get_option('catch2').enabled() and get_option('benchmarks').enabled()
   bench_sources = files(
     join_paths(meson.project_source_root(), 'tools', 'bench_c2.cpp'),
   )
@@ -105,7 +107,8 @@ if get_option('benchmarks').enabled()
     dependencies: [libfaest_{param_name}_dependency, boost_program_options, catch2],
     include_directories: include_directories,
     c_args: defines + c_flags,
-    cpp_args: defines + cpp_flags
+    cpp_args: defines + cpp_flags,
+    link_args: linker_flags
   )
 endif
 """

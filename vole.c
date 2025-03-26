@@ -12,110 +12,87 @@
 #include "random_oracle.h"
 
 #include <stdbool.h>
+#include <string.h>
+
+static const uint32_t TWEAK_OFFSET = UINT32_C(0x80000000); // 2^31
 
 #if !defined(FAEST_TESTS)
 static
 #endif
-    void
-    ConvertToVole(const uint8_t* iv, const uint8_t* sd, bool sd0_bot, unsigned int lambda,
-                  unsigned int depth, unsigned int outLenBytes, uint8_t* u, uint8_t* v) {
-  const unsigned int num_instances = 1 << depth;
+    unsigned int
+    convert_to_vole(const uint8_t* iv, const uint8_t* sd, bool sd0_bot, unsigned int i,
+                    unsigned int outlen, uint8_t* u, uint8_t* v, const faest_paramset_t* params) {
+  const unsigned int lambda        = params->lambda;
+  const unsigned int tau_1         = params->tau1;
+  const unsigned int k             = params->k;
+  const unsigned int num_instances = bavc_max_node_index(i, tau_1, k);
   const unsigned int lambda_bytes  = lambda / 8;
+  const unsigned int depth         = bavc_max_node_depth(i, tau_1, k);
 
-  // (depth + 1) x num_instances array of outLenBytes; but we only need to rows at a time
-  uint8_t* r = calloc(2 * num_instances, outLenBytes);
+  // (depth + 1) x num_instances array of outlen; but we only need two rows at a time
+  uint8_t* r = calloc(2 * num_instances, outlen);
 
-#define R(row, column) (r + (((row) % 2) * num_instances + (column)) * outLenBytes)
-#define V(idx) (v + (idx)*outLenBytes)
+#define R(row, column) (r + (((row) % 2) * num_instances + (column)) * outlen)
+#define V(idx) (v + (idx) * outlen)
+
+  uint32_t tweak = i ^ TWEAK_OFFSET;
 
   // Step: 2
   if (!sd0_bot) {
-    prg(sd, iv, R(0, 0), lambda, outLenBytes);
+    prg(sd, iv, tweak, R(0, 0), lambda, outlen);
   }
 
   // Step: 3..4
-  for (unsigned int i = 1; i < num_instances; i++) {
-    prg(sd + (lambda_bytes * i), iv, R(0, i), lambda, outLenBytes);
+  for (unsigned int j = 1; j < num_instances; ++j) {
+    prg(sd + lambda_bytes * j, iv, tweak, R(0, j), lambda, outlen);
   }
 
   // Step: 5..9
-  memset(v, 0, depth * outLenBytes);
+  memset(v, 0, depth * outlen);
   for (unsigned int j = 0; j < depth; j++) {
     unsigned int depthloop = num_instances >> (j + 1);
-    for (unsigned int i = 0; i < depthloop; i++) {
-      xor_u8_array(V(j), R(j, 2 * i + 1), V(j), outLenBytes);
-      xor_u8_array(R(j, 2 * i), R(j, 2 * i + 1), R(j + 1, i), outLenBytes);
+    for (unsigned int idx = 0; idx < depthloop; idx++) {
+      xor_u8_array(V(j), R(j, 2 * idx + 1), V(j), outlen);
+      xor_u8_array(R(j, 2 * idx), R(j, 2 * idx + 1), R(j + 1, idx), outlen);
     }
   }
   // Step: 10
   if (!sd0_bot && u != NULL) {
-    memcpy(u, R(depth, 0), outLenBytes);
+    memcpy(u, R(depth, 0), outlen);
   }
   free(r);
-}
-
-int ChalDec(const uint8_t* chal, unsigned int i, unsigned int k0, unsigned int t0, unsigned int k1,
-            unsigned int t1, uint8_t* chalout) {
-  if (i >= t0 + t1) {
-    return 0;
-  }
-
-  unsigned int lo;
-  unsigned int hi;
-  if (i < t0) {
-    lo = i * k0;
-    hi = ((i + 1) * k0);
-  } else {
-    unsigned int t = i - t0;
-    lo             = (t0 * k0) + (t * k1);
-    hi             = (t0 * k0) + ((t + 1) * k1);
-  }
-
-  assert(hi - lo == k0 || hi - lo == k1);
-  for (unsigned int j = lo; j < hi; ++j) {
-    // set_bit(chalout, i - lo, get_bit(chal, i));
-    chalout[j - lo] = ptr_get_bit(chal, j);
-  }
-  return 1;
+  return depth;
 }
 
 void vole_commit(const uint8_t* rootKey, const uint8_t* iv, unsigned int ellhat,
-                 const faest_paramset_t* params, uint8_t* hcom, vec_com_t* vecCom, uint8_t* c,
-                 uint8_t* u, uint8_t** v) {
-  unsigned int lambda       = params->faest_param.lambda;
-  unsigned int lambda_bytes = lambda / 8;
-  unsigned int ellhat_bytes = (ellhat + 7) / 8;
-  unsigned int tau          = params->faest_param.tau;
-  unsigned int tau0         = params->faest_param.t0;
-  unsigned int k0           = params->faest_param.k0;
-  unsigned int k1           = params->faest_param.k1;
+                 const faest_paramset_t* params, bavc_t* bavc, uint8_t* c, uint8_t* u,
+                 uint8_t** v) {
+  const unsigned int lambda       = params->lambda;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int ellhat_bytes = (ellhat + 7) / 8;
+  const unsigned int tau          = params->tau;
+  const unsigned int tau_1        = params->tau1;
+  const unsigned int k            = params->k;
+
+  bavc_commit(bavc, rootKey, iv, params);
 
   uint8_t* ui = malloc(tau * ellhat_bytes);
-
-  // Step 1
-  uint8_t* expanded_keys = malloc(tau * lambda_bytes);
-  prg(rootKey, iv, expanded_keys, lambda, lambda_bytes * tau);
-
-  // for Step 12
-  H1_context_t h1_ctx;
-  H1_init(&h1_ctx, lambda);
+  assert(ui);
 
   unsigned int v_idx = 0;
-  for (unsigned int i = 0; i < tau; i++) {
-    // Step 4
-    unsigned int depth = i < tau0 ? k0 : k1;
-
-    // Step 5
-    vector_commitment(expanded_keys + i * lambda_bytes, iv, params, lambda, &vecCom[i], depth);
+  uint8_t* sd_i      = bavc->sd;
+  for (unsigned int i = 0; i < tau; ++i) {
     // Step 6
-    ConvertToVole(iv, vecCom[i].sd, false, lambda, depth, ellhat_bytes, ui + i * ellhat_bytes,
-                  v[v_idx]);
-    // Step 7 (and parts of 8)
-    v_idx += depth;
-    // Step 12 (part)
-    H1_update(&h1_ctx, vecCom[i].h, lambda_bytes * 2);
+    v_idx +=
+        convert_to_vole(iv, sd_i, false, i, ellhat_bytes, ui + i * ellhat_bytes, v[v_idx], params);
+    sd_i += lambda_bytes * bavc_max_node_index(i, tau_1, k);
   }
-  free(expanded_keys);
+
+  // ensure 0-padding up to lambda
+  for (; v_idx != lambda; ++v_idx) {
+    memset(v[v_idx], 0, ellhat_bytes);
+  }
+
   // Step 9
   memcpy(u, ui, ellhat_bytes);
   for (unsigned int i = 1; i < tau; i++) {
@@ -123,67 +100,80 @@ void vole_commit(const uint8_t* rootKey, const uint8_t* iv, unsigned int ellhat,
     xor_u8_array(u, ui + i * ellhat_bytes, c + (i - 1) * ellhat_bytes, ellhat_bytes);
   }
   free(ui);
-
-  // Step 12: Generating final commitment from all the com commitments
-  H1_final(&h1_ctx, hcom, lambda_bytes * 2);
 }
 
-void vole_reconstruct(const uint8_t* iv, const uint8_t* chall, const uint8_t* const* pdec,
-                      const uint8_t* const* com_j, uint8_t* hcom, uint8_t** q, unsigned int ellhat,
+bool vole_reconstruct(uint8_t* com, uint8_t** q, const uint8_t* iv, const uint8_t* chall_3,
+                      const uint8_t* decom_i, const uint8_t* c, unsigned int ellhat,
                       const faest_paramset_t* params) {
-  unsigned int lambda       = params->faest_param.lambda;
-  unsigned int lambda_bytes = lambda / 8;
-  unsigned int ellhat_bytes = (ellhat + 7) / 8;
-  unsigned int tau          = params->faest_param.tau;
-  unsigned int tau0         = params->faest_param.t0;
-  unsigned int tau1         = params->faest_param.t1;
-  unsigned int k0           = params->faest_param.k0;
-  unsigned int k1           = params->faest_param.k1;
+  const unsigned int lambda       = params->lambda;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int ellhat_bytes = (ellhat + 7) / 8;
+  const unsigned int tau          = params->tau;
+  const unsigned int tau1         = params->tau1;
+  const unsigned int L            = params->L;
+  const unsigned int k            = params->k;
 
-  uint8_t* sd = malloc((1 << MAX(k0, k1)) * lambda_bytes);
-  memset(sd, 0, lambda_bytes);
+  uint16_t i_delta[MAX_TAU];
+  if (!decode_all_chall_3(i_delta, chall_3, params)) {
+    return false;
+  }
 
-  // Step 9
-  H1_context_t h1_ctx;
-  H1_init(&h1_ctx, lambda);
+  bavc_rec_t bavc_rec;
+  bavc_rec.h = com;
+  bavc_rec.s = malloc((L - tau) * lambda_bytes);
+  assert(bavc_rec.s);
 
-  vec_com_rec_t vecComRec;
-  vecComRec.h   = malloc(lambda_bytes * 2);
-  vecComRec.k   = calloc(getBinaryTreeNodeCount(MAX(k0, k1)), lambda_bytes);
-  vecComRec.com = malloc((1 << MAX(k0, k1)) * lambda_bytes * 2);
-  vecComRec.s   = malloc((1 << MAX(k0, k1)) * lambda_bytes);
+  if (!bavc_reconstruct(&bavc_rec, decom_i, i_delta, iv, params)) {
+    free(bavc_rec.s);
+    return false;
+  }
+
+  uint8_t* sd   = malloc((1 << k) * lambda_bytes);
+  uint8_t* qtmp = malloc(MAX_DEPTH * ellhat_bytes);
+  assert(sd);
+  assert(qtmp);
 
   // Step: 1
   unsigned int q_idx = 0;
+  uint8_t* sd_i      = bavc_rec.s;
   for (unsigned int i = 0; i < tau; i++) {
     // Step: 2
-    unsigned int depth = i < tau0 ? k0 : k1;
-    unsigned int N     = 1 << depth;
-
-    // Step 3
-    uint8_t chalout[MAX_DEPTH];
-    ChalDec(chall, i, k0, tau0, k1, tau1, chalout);
-    // Step 4
-    unsigned int idx = NumRec(depth, chalout);
-
-    // Step 5
-    vector_reconstruction(iv, pdec[i], com_j[i], chalout, lambda, depth, &vecComRec);
+    const unsigned int Ni = bavc_max_node_index(i, tau1, k);
 
     // Step: 6
-    for (unsigned int j = 1; j < N; j++) {
-      memcpy(sd + j * lambda_bytes, vecComRec.s + (lambda_bytes * (j ^ idx)), lambda_bytes);
+    for (unsigned int j = 0; j < Ni; j++) {
+      if (j < i_delta[i]) {
+        memcpy(sd + (j ^ i_delta[i]) * lambda_bytes, sd_i + lambda_bytes * j, lambda_bytes);
+      } else if (j > i_delta[i]) {
+        memcpy(sd + (j ^ i_delta[i]) * lambda_bytes, sd_i + lambda_bytes * (j - 1), lambda_bytes);
+      }
     }
 
     // Step: 7..8
-    ConvertToVole(iv, sd, true, lambda, depth, ellhat_bytes, NULL, q[q_idx]);
-    q_idx += depth;
+    const unsigned int ki = convert_to_vole(iv, sd, true, i, ellhat_bytes, NULL, qtmp, params);
 
-    // Step 9
-    H1_update(&h1_ctx, vecComRec.h, lambda_bytes * 2);
+    // Step 11
+    if (i == 0) {
+      // Step 8
+      memcpy(q[q_idx], qtmp, ellhat_bytes * ki);
+      q_idx += ki;
+    } else {
+      // Step 14
+      for (unsigned int d = 0; d < ki; ++d, ++q_idx) {
+        masked_xor_u8_array(qtmp + d * ellhat_bytes, c + (i - 1) * ellhat_bytes, q[q_idx],
+                            (i_delta[i] >> d) & 1, ellhat_bytes);
+      }
+    }
+    sd_i += lambda_bytes * (Ni - 1);
   }
-  vec_com_rec_clear(&vecComRec);
-  free(sd);
 
-  // Step: 9
-  H1_final(&h1_ctx, hcom, lambda_bytes * 2);
+  // ensure 0-padding up to lambda
+  for (; q_idx != lambda; ++q_idx) {
+    memset(q[q_idx], 0, ellhat_bytes);
+  }
+
+  free(qtmp);
+  free(sd);
+  free(bavc_rec.s);
+  return true;
 }

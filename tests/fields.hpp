@@ -7,19 +7,23 @@
 
 #include "../fields.h"
 
-#include <NTL/GF2X.h>
 #include <boost/format.hpp>
 #include <algorithm>
 #include <iterator>
 #include <array>
 
+#if defined(HAVE_NTL)
+#include <NTL/GF2X.h>
 using namespace NTL;
+#endif
 
 namespace {
+#if defined(HAVE_NTL)
   static inline GF2X DivMod(const GF2X& lhs, const GF2X& rhs, const GF2XModulus& modulus) {
     const auto denom = InvMod(rhs, modulus);
     return MulMod(lhs, denom, modulus);
   }
+#endif
 
   class bf8 {
     bf8_t value;
@@ -65,6 +69,7 @@ namespace {
       return value == other.value;
     }
 
+#if defined(HAVE_NTL)
     GF2X as_ntl() const {
       GF2X ret;
       auto v = value;
@@ -73,6 +78,7 @@ namespace {
       }
       return ret;
     }
+#endif
 
     bf8_t as_internal() const {
       return value;
@@ -84,6 +90,7 @@ namespace {
       return ret;
     }
 
+#if defined(HAVE_NTL)
     static GF2X ntl_residue() {
       GF2X residue;
       SetCoeff(residue, 8);
@@ -93,6 +100,7 @@ namespace {
       SetCoeff(residue, 0);
       return residue;
     }
+#endif
 
     static bf8 random() {
       return bf8_rand();
@@ -151,14 +159,11 @@ namespace {
       return {bf64_mul(value, other.value)};
     }
 
-    bf64 operator/(bf64 other) const {
-      return {bf64_mul(value, bf64_inv(other.value))};
-    }
-
     bool operator==(bf64 other) const {
       return value == other.value;
     }
 
+#if defined(HAVE_NTL)
     GF2X as_ntl() const {
       GF2X ret;
       auto v = value;
@@ -167,6 +172,7 @@ namespace {
       }
       return ret;
     }
+#endif
 
     bf64_t as_internal() const {
       return value;
@@ -178,6 +184,7 @@ namespace {
       return ret;
     }
 
+#if defined(HAVE_NTL)
     static GF2X ntl_residue() {
       GF2X residue;
       SetCoeff(residue, 64);
@@ -187,6 +194,7 @@ namespace {
       SetCoeff(residue, 0);
       return residue;
     }
+#endif
 
     static bf64 random() {
       return bf64_rand();
@@ -210,10 +218,10 @@ namespace {
     bf128_t value;
 
   public:
-    typedef std::array<uint8_t, 16> bytes;
+    typedef std::array<uint8_t, BF128_NUM_BYTES> bytes;
 
     bf128() : value{0} {}
-    bf128(uint64_t v) : value{{v, 0}} {}
+    bf128(uint64_t v) : value{bf128_from_bf64(v)} {}
     bf128(bf128_t v) : value{v} {}
     bf128(bf64 v) : value{bf128_from_bf64(v.as_internal())} {}
     bf128(const bytes& b) : value{bf128_load(b.data())} {}
@@ -247,27 +255,29 @@ namespace {
       return {bf128_mul(value, other.value)};
     }
 
-    bf128 operator/(bf128 other) const {
-      return {bf128_mul(value, bf128_inv(other.value))};
+    bf128 operator*(bf64 other) const {
+      return {bf128_mul_64(value, other.as_internal())};
     }
 
     bool operator==(bf128 other) const {
-      return std::equal(std::begin(value.values), std::end(value.values),
-                        std::begin(other.value.values), std::end(other.value.values));
+      return BF_VALUE(value, 0) == BF_VALUE(other.value, 0) &&
+             BF_VALUE(value, 1) == BF_VALUE(other.value, 1);
     }
 
+#if defined(HAVE_NTL)
     GF2X as_ntl() const {
       GF2X ret;
-      auto v = value.values[0];
+      auto v = BF_VALUE(value, 0);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i, v & 1);
       }
-      v = value.values[1];
+      v = BF_VALUE(value, 1);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 64, v & 1);
       }
       return ret;
     }
+#endif
 
     bf128_t as_internal() const {
       return value;
@@ -279,6 +289,7 @@ namespace {
       return ret;
     }
 
+#if defined(HAVE_NTL)
     static GF2X ntl_residue() {
       GF2X residue;
       SetCoeff(residue, 128);
@@ -288,6 +299,7 @@ namespace {
       SetCoeff(residue, 0);
       return residue;
     }
+#endif
 
     static bf128 random() {
       return bf128_rand();
@@ -303,8 +315,8 @@ namespace {
   };
 
   static inline std::ostream& operator<<(std::ostream& stream, bf128 v) {
-    auto value = v.as_internal();
-    stream << boost::format("%08x %08x") % value.values[1] % value.values[0];
+    const auto value = v.as_internal();
+    stream << boost::format("%08x %08x") % BF_VALUE(value, 1) % BF_VALUE(value, 0);
     return stream;
   }
 
@@ -312,10 +324,10 @@ namespace {
     bf192_t value;
 
   public:
-    typedef std::array<uint8_t, 24> bytes;
+    typedef std::array<uint8_t, BF192_NUM_BYTES> bytes;
 
     bf192() : value{0} {}
-    bf192(uint64_t v) : value{{v, 0, 0}} {}
+    bf192(uint64_t v) : value{bf192_from_bf64(v)} {}
     bf192(bf192_t v) : value{v} {}
     bf192(bf64 v) : value{bf192_from_bf64(v.as_internal())} {}
     bf192(const bytes& b) : value{bf192_load(b.data())} {}
@@ -349,31 +361,34 @@ namespace {
       return {bf192_mul(value, other.value)};
     }
 
-    bf192 operator/(bf192 other) const {
-      return {bf192_mul(value, bf192_inv(other.value))};
+    bf192 operator*(bf64 other) const {
+      return {bf192_mul_64(value, other.as_internal())};
     }
 
     bool operator==(bf192 other) const {
-      return std::equal(std::begin(value.values), std::end(value.values),
-                        std::begin(other.value.values), std::end(other.value.values));
+      return BF_VALUE(value, 0) == BF_VALUE(other.value, 0) &&
+             BF_VALUE(value, 1) == BF_VALUE(other.value, 1) &&
+             BF_VALUE(value, 2) == BF_VALUE(other.value, 2);
     }
 
+#if defined(HAVE_NTL)
     GF2X as_ntl() const {
       GF2X ret;
-      auto v = value.values[0];
+      auto v = BF_VALUE(value, 0);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i, v & 1);
       }
-      v = value.values[1];
+      v = BF_VALUE(value, 1);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 64, v & 1);
       }
-      v = value.values[2];
+      v = BF_VALUE(value, 2);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 128, v & 1);
       }
       return ret;
     }
+#endif
 
     bf192_t as_internal() const {
       return value;
@@ -385,6 +400,7 @@ namespace {
       return ret;
     }
 
+#if defined(HAVE_NTL)
     static GF2X ntl_residue() {
       GF2X residue;
       SetCoeff(residue, 192);
@@ -394,6 +410,7 @@ namespace {
       SetCoeff(residue, 0);
       return residue;
     }
+#endif
 
     static bf192 random() {
       return bf192_rand();
@@ -409,8 +426,9 @@ namespace {
   };
 
   static inline std::ostream& operator<<(std::ostream& stream, bf192 v) {
-    auto value = v.as_internal();
-    stream << boost::format("%08x %08x %08x") % value.values[2] % value.values[1] % value.values[0];
+    const auto value = v.as_internal();
+    stream << boost::format("%08x %08x %08x") % BF_VALUE(value, 2) % BF_VALUE(value, 1) %
+                  BF_VALUE(value, 0);
     return stream;
   }
 
@@ -418,10 +436,10 @@ namespace {
     bf256_t value;
 
   public:
-    typedef std::array<uint8_t, 32> bytes;
+    typedef std::array<uint8_t, BF256_NUM_BYTES> bytes;
 
     bf256() : value{0} {}
-    bf256(uint64_t v) : value{{v, 0, 0, 0}} {}
+    bf256(uint64_t v) : value{bf256_from_bf64(v)} {}
     bf256(bf256_t v) : value{v} {}
     bf256(bf64 v) : value{bf256_from_bf64(v.as_internal())} {}
     bf256(const bytes& b) : value{bf256_load(b.data())} {}
@@ -455,35 +473,39 @@ namespace {
       return {bf256_mul(value, other.value)};
     }
 
-    bf256 operator/(bf256 other) const {
-      return {bf256_mul(value, bf256_inv(other.value))};
+    bf256 operator*(bf64 other) const {
+      return {bf256_mul_64(value, other.as_internal())};
     }
 
     bool operator==(bf256 other) const {
-      return std::equal(std::begin(value.values), std::end(value.values),
-                        std::begin(other.value.values), std::end(other.value.values));
+      return BF_VALUE(value, 0) == BF_VALUE(other.value, 0) &&
+             BF_VALUE(value, 1) == BF_VALUE(other.value, 1) &&
+             BF_VALUE(value, 2) == BF_VALUE(other.value, 2) &&
+             BF_VALUE(value, 3) == BF_VALUE(other.value, 3);
     }
 
+#if defined(HAVE_NTL)
     GF2X as_ntl() const {
       GF2X ret;
-      auto v = value.values[0];
+      auto v = BF_VALUE(value, 0);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i, v & 1);
       }
-      v = value.values[1];
+      v = BF_VALUE(value, 1);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 64, v & 1);
       }
-      v = value.values[2];
+      v = BF_VALUE(value, 2);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 128, v & 1);
       }
-      v = value.values[3];
+      v = BF_VALUE(value, 3);
       for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
         SetCoeff(ret, i + 192, v & 1);
       }
       return ret;
     }
+#endif
 
     bf256_t as_internal() const {
       return value;
@@ -495,6 +517,7 @@ namespace {
       return ret;
     }
 
+#if defined(HAVE_NTL)
     static GF2X ntl_residue() {
       GF2X residue;
       SetCoeff(residue, 256);
@@ -504,6 +527,7 @@ namespace {
       SetCoeff(residue, 0);
       return residue;
     }
+#endif
 
     static bf256 random() {
       return bf256_rand();
@@ -519,9 +543,9 @@ namespace {
   };
 
   static inline std::ostream& operator<<(std::ostream& stream, bf256 v) {
-    auto value = v.as_internal();
-    stream << boost::format("%08x %08x %08x %08x") % value.values[3] % value.values[2] %
-                  value.values[1] % value.values[0];
+    const auto value = v.as_internal();
+    stream << boost::format("%08x %08x %08x %08x") % BF_VALUE(value, 3) % BF_VALUE(value, 2) %
+                  BF_VALUE(value, 1) % BF_VALUE(value, 0);
     return stream;
   }
 } // namespace
