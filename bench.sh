@@ -16,9 +16,9 @@ FAEST_EM_192F="faest_em_192f"
 FAEST_EM_256S="faest_em_256s"
 FAEST_EM_256F="faest_em_256f"
 
-ALL="FAEST_128S FAEST_128F FAEST_192S FAEST_192F FAEST_256S FAEST_256F FAEST_EM_128S FAEST_EM_128F FAEST_EM_192S FAEST_EM_192F FAEST_EM_256S FAEST_EM_256F"
+ALL="faest_128s faest_128f faest_192s faest_192f faest_256s faest_256f faest_em_128s faest_em_128f faest_em_192s faest_em_192f faest_em_256s faest_em_256f"
 
-BUILD_DIR="build_release"
+BUILD_DIR="build"
 
 clean () {
     make clean
@@ -42,7 +42,7 @@ run_test () {
 
 convert_to_us () {
     input="$1"
-    if ! echo "${input}" | grep -Pq '^\d+(\.\d+)? (u|m|n)?s$'; then
+    if ! echo "${input}" | ggrep -Pq '^\d+(\.\d+)? (u|m|n)?s$'; then
         echo "unexpected format: '${input}'" >&2
         exit 1
     fi
@@ -73,34 +73,34 @@ parse_output () {
     std_dev="`echo ${line3} | cut -d ' ' -f 1-2`"
     low_std_dev="`echo ${line3} | cut -d ' ' -f 3-4`"
     high_std_dev="`echo ${line3} | cut -d ' ' -f 5-6`"
-    json="`jq -n \
-        --argjson "samples" "${samples}" \
-        --argjson "iterations" "${iterations}" \
-        --argjson "estimated" "$(convert_to_us "${estimated}")" \
-        --argjson "mean_us" "$(convert_to_us "${mean}")" \
-        --argjson "low_mean_us" "$(convert_to_us "${low_mean}")" \
-        --argjson "high_mean_us" "$(convert_to_us "${high_mean}")" \
-        --argjson "std_dev_us" "$(convert_to_us "${std_dev}")" \
-        --argjson "low_std_dev_us" "$(convert_to_us "${low_std_dev}")" \
-        --argjson "high_std_dev_us" "$(convert_to_us "${high_std_dev}")" \
-        '$ARGS.named' \
-        `"
-    echo "${json}"
+    #json="`jq -n \
+    #    --argjson "samples" "${samples}" \
+    #    --argjson "iterations" "${iterations}" \
+    #    --argjson "estimated" "$(convert_to_us "${estimated}")" \
+    #    --argjson "mean_us" "$(convert_to_us "${mean}")" \
+    #    --argjson "low_mean_us" "$(convert_to_us "${low_mean}")" \
+    #    --argjson "high_mean_us" "$(convert_to_us "${high_mean}")" \
+    #    --argjson "std_dev_us" "$(convert_to_us "${std_dev}")" \
+    #    --argjson "low_std_dev_us" "$(convert_to_us "${low_std_dev}")" \
+    #    --argjson "high_std_dev_us" "$(convert_to_us "${high_std_dev}")" \
+    #    '$ARGS.named' \
+    #    `"
+    #echo "${json}"
 }
 
 gather_metadata () {
     hostname="`uname -n`"
     user="`whoami`"
-    timestamp="`date --iso-8601=ns`"
+    timestamp="`gdate --iso-8601=ns`"
     git_commit="`git rev-parse --verify HEAD`"
-    json="`jq -c -n \
-        --arg "hostname" "${hostname}" \
-        --arg "user" "${user}" \
-        --arg "timestamp" "${timestamp}" \
-        --arg "git_commit" "${timestamp}" \
-        '$ARGS.named' \
-        `"
-    echo "${json}"
+    #json="`jq -c -n \
+    #    --arg "hostname" "${hostname}" \
+    #    --arg "user" "${user}" \
+    #    --arg "timestamp" "${timestamp}" \
+    #    --arg "git_commit" "${timestamp}" \
+    #    '$ARGS.named' \
+    #    `"
+    #echo "${json}"
 }
 
 run_bench () {
@@ -112,36 +112,36 @@ run_bench () {
 
     bench_out="`"./${BUILD_DIR}/${setting_id}/${setting_id}_bench_c2" '[bench]'`"
 
-    bench_keygen_out="`echo "${bench_out}" | grep -P '^keygen' -A 2`"
-    bench_sign_out="`echo "${bench_out}" | grep -P '^sign' -A 2`"
-    bench_verify_out="`echo "${bench_out}" | grep -P '^verify' -A 2`"
+    bench_keygen_out="`echo "${bench_out}" | ggrep -P '^keygen' -A 2`"
+    bench_sign_out="`echo "${bench_out}" | ggrep -P '^sign' -A 2`"
+    bench_verify_out="`echo "${bench_out}" | ggrep -P '^verify' -A 2`"
 
-    sk_size="`grep CRYPTO_SECRETKEYBYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3- | bc`"
-    pk_size="`grep CRYPTO_PUBLICKEYBYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3`"
-    sig_size="`grep CRYPTO_BYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3`"
+    sk_size="`ggrep CRYPTO_SECRETKEYBYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3- | bc`"
+    pk_size="`ggrep CRYPTO_PUBLICKEYBYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3`"
+    sig_size="`ggrep CRYPTO_BYTES < "./${BUILD_DIR}/${setting_id}/api.h" | cut -d ' ' -f 3`"
     keygen_results="`parse_output "${bench_keygen_out}"`"
     sign_results="`parse_output "${bench_sign_out}"`"
     verify_results="`parse_output "${bench_verify_out}"`"
 
-    json="`jq -c -n \
-        --arg "implementation" "ref" \
-        --arg "variant" "${name}" \
-        --arg "setting_id" "${setting_id}" \
-        --argjson "sig_size_bytes" "${sig_size}" \
-        --argjson "sk_size_bytes" "${sk_size}" \
-        --argjson "pk_size_bytes" "${pk_size}" \
-        --argjson "keygen" "${keygen_results}" \
-        --argjson "sign" "${sign_results}" \
-        --argjson "verify" "${verify_results}" \
-        --argjson "meta" "${meta}" \
-        '$ARGS.named' \
-        `"
-    echo "${json}"
+    #json="`jq -c -n \
+    #    --arg "implementation" "ref" \
+    #    --arg "variant" "${name}" \
+    #    --arg "setting_id" "${setting_id}" \
+    #    --argjson "sig_size_bytes" "${sig_size}" \
+    #    --argjson "sk_size_bytes" "${sk_size}" \
+    #    --argjson "pk_size_bytes" "${pk_size}" \
+    #    --argjson "keygen" "${keygen_results}" \
+    #    --argjson "sign" "${sign_results}" \
+    #    --argjson "verify" "${verify_results}" \
+    #    --argjson "meta" "${meta}" \
+    #    '$ARGS.named' \
+    #    `"
+    #echo "${json}"
 }
 
 bench_spec_variants () {
     for faest_variant in $ALL; do
-        declare -n setting_id="${faest_variant}"
+        setting_id="${faest_variant}"
         run_make "${faest_variant}" "${setting_id}"
         run_test "${faest_variant}" "${setting_id}"
         run_bench "${faest_variant}" "${setting_id}"

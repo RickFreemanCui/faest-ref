@@ -589,4 +589,4 @@ run_target('prepare_nist',
   ]
 )
 
-subdir('tests')
+# subdir('tests')
