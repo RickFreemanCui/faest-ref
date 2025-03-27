@@ -1,8 +1,11 @@
 CC?=gcc
 CXX?=g++
-CFLAGS+=-g -O3 -std=gnu11 -march=native -Wno-psabi
-CPPFLAGS+=-I. -Isha3 -DNDEBUG -DHAVE_OPENSSL -DFAEST_EXPORT=
-
+CFLAGS+=-g -O3 -std=gnu11 -march=native -Wno-psabi -I/opt/homebrew/Cellar/openssl@3/3.4.1/include
+CPPFLAGS+=-I. -Isha3 -DNDEBUG -DHAVE_OPENSSL -DFAEST_EXPORT= -I/opt/homebrew/Cellar/openssl@3/3.4.1/include
+LDFLAGS+="-L/opt/homebrew/Cellar/openssl@3/3.4.1/lib"
+PKG_CONFIG_PATH+="/opt/homebrew/Cellar/openssl@3/3.4.1/lib/pkgconfig"
+# How to solve -lcrypto not found:
+# https://blog.csdn.net/fjh1997/article/details/106004642
 SOURCES=$(filter-out randomness.c,$(wildcard *.c)) $(wildcard sha3/*.c)
 EXECUTABLE_APITEST=tests/api_test
 EXECUTABLE_NISTKAT=NIST-KATs/PQCgenKAT_sign
