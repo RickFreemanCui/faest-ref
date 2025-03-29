@@ -579,8 +579,6 @@ ATTR_CONST ATTR_ALWAYS_INLINE static inline bf512_t bf512_one(void) {
   return ret;
 }
 
-ATTR_PURE bf512_t bf512_byte_combine(const bf512_t* x);
-ATTR_PURE bf512_t bf512_byte_combine_bits(uint8_t x);
 bf512_t bf512_rand(void);
 
 ATTR_CONST static inline bf512_t bf512_add(bf512_t lhs, bf512_t rhs) {

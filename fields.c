@@ -1036,9 +1036,43 @@ bf768_t bf768_mul_256(bf768_t lhs, bf256_t rhs) {
   return result;
 }
 
-ATTR_PURE bf512_t bf512_byte_combine(const bf512_t* x);
-ATTR_PURE bf512_t bf512_byte_combine_bits(uint8_t x);
-bf512_t bf512_rand(void);
+// GF(2^ 512)
+static inline bf512_t bf512_and_64(bf512_t lhs, bf64_t rhs) {
+  for (unsigned int i = 0; i != ARRAY_SIZE(lhs.values); ++i) {
+    lhs.values[i] &= rhs;
+  }
+  return lhs;
+}
+
+
+static inline bf512_t bf512_shift_left_1(bf512_t value) {
+  value.values[7] = (value.values[7] << 1) | (value.values[6] >> 63);
+  value.values[6] = (value.values[6] << 1) | (value.values[5] >> 63);
+  value.values[5] = (value.values[5] << 1) | (value.values[4] >> 63);
+  value.values[4] = (value.values[4] << 1) | (value.values[3] >> 63);
+  value.values[3] = (value.values[3] << 1) | (value.values[2] >> 63);
+  value.values[2] = (value.values[2] << 1) | (value.values[1] >> 63);
+  value.values[1] = (value.values[1] << 1) | (value.values[0] >> 63);
+  value.values[0] = value.values[0] << 1;
+  return value;
+}
+
+
+bf512_t bf512_rand(void) {
+  uint8_t buf[BF512_NUM_BYTES];
+  rand_bytes(buf, sizeof(buf));
+  return bf512_load(buf);
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline uint64_t bf512_bit_to_uint64_mask(bf512_t value,
+                                                                              unsigned int bit) {
+  const unsigned int byte_idx = bit / 64;
+  const unsigned int bit_idx  = bit % 64;
+
+  return -((BF_VALUE(value, byte_idx) >> bit_idx) & 1);
+}
+
+
 
 bf512_t bf512_mul(bf512_t lhs, bf512_t rhs) {
     bf512_t result = bf512_and_64(lhs, bf512_bit_to_uint64_mask(rhs, 0));
@@ -1055,7 +1089,47 @@ bf512_t bf512_mul(bf512_t lhs, bf512_t rhs) {
   }
 
 
-ATTR_CONST bf512_t bf512_mul_64(bf512_t lhs, bf64_t rhs);
-ATTR_CONST bf512_t bf512_mul_bit(bf512_t lhs, uint8_t rhs);
+bf512_t bf512_mul_64(bf512_t lhs, bf64_t rhs) {
+  bf512_t result = bf512_and_64(lhs, bf64_bit_to_mask(rhs, 0));
+  for (unsigned int idx = 1; idx != 64; ++idx) {
+    const uint64_t mask = bf512_bit_to_uint64_mask(lhs, 512 - 1);
+    lhs                 = bf512_shift_left_1(lhs);
+    BF_VALUE(lhs, 0) ^= mask & bf512_modulus;
+    result = bf512_add(result, bf512_and_64(lhs, bf64_bit_to_mask(rhs, idx)));
+  }
+  return result;
+}
+
+
+bf512_t bf512_mul_bit(bf512_t lhs, uint8_t rhs) {
+  return bf512_and_64(lhs, -((uint64_t)rhs & 1));
+}
+
+
+
 ATTR_PURE bf512_t bf512_sum_poly(const bf512_t* xs);
 ATTR_PURE bf512_t bf512_sum_poly_bits(const uint8_t* xs);
+
+
+ATTR_CONST static inline bf512_t bf512_dbl(bf512_t lhs) {
+  uint64_t mask = bf512_bit_to_uint64_mask(lhs, 512 - 1);
+  lhs           = bf512_shift_left_1(lhs);
+  BF_VALUE(lhs, 0) ^= mask & bf512_modulus;
+  return lhs;
+}
+
+bf512_t bf512_sum_poly(const bf512_t* xs) {
+  bf512_t ret = xs[512 - 1];
+  for (size_t i = 1; i < 512; ++i) {
+    ret = bf512_add(bf512_dbl(ret), xs[512 - 1 - i]);
+  }
+  return ret;
+}
+
+bf512_t bf512_sum_poly_bits(const uint8_t* xs) {
+  bf512_t ret = bf512_from_bit(ptr_get_bit(xs, 512 - 1));
+  for (size_t i = 1; i < 512; ++i) {
+    ret = bf512_add(bf512_dbl(ret), bf512_from_bit(ptr_get_bit(xs, 512 - 1 - i)));
+  }
+  return ret;
+}

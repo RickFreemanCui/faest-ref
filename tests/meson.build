@@ -1,7 +1,12 @@
-inc = include_directories('/opt/homebrew/opt/ntl/include')
+myincs = []
+mydirs = []
+if host_machine.system() == 'macos'
+  myincs += include_directories('/opt/homebrew/opt/ntl/include')
+  mydirs += '/opt/homebrew/opt/ntl/lib'
+endif
 
 boost_test = dependency('boost', required: false, modules: ['unit_test_framework'])
-ntl = cpp.find_library('ntl', dirs: ['/opt/homebrew/opt/ntl/lib'], required: true, has_headers: ['NTL/version.h'], header_include_directories: inc)
+ntl = cpp.find_library('ntl', dirs: mydirs, required: true, has_headers: ['NTL/version.h'], header_include_directories: myincs)
 
 if boost_test.found()
   test_sources = files(
