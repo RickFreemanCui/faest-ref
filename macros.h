@@ -212,6 +212,9 @@
 #define ATTR_VECTOR_SIZE(s)
 #endif
 
+// For non-vectorized implementation
+#undef HAVE_ATTR_VECTOR_SIZE
+
 /* malloc attribute */
 #if GNUC_CHECK(11, 0)
 #define ATTR_MALLOC(arg) __attribute__((malloc, malloc(arg)))

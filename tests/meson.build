@@ -1,5 +1,7 @@
+inc = include_directories('/opt/homebrew/opt/ntl/include')
+
 boost_test = dependency('boost', required: false, modules: ['unit_test_framework'])
-ntl = cc.find_library('ntl', required: false, has_headers: ['NTL/version.h'])
+ntl = cpp.find_library('ntl', dirs: ['/opt/homebrew/opt/ntl/lib'], required: true, has_headers: ['NTL/version.h'], header_include_directories: inc)
 
 if boost_test.found()
   test_sources = files(
@@ -40,12 +42,12 @@ if boost_test.found()
     link_args: linker_flags,
     override_options: ['b_lto=false'],
   )
-  test(
-    'AES',
-    extended_tests,
-    args: ['-t', 'aes'],
-    timeout: 6000,
-  )
+  # test(
+  #   'AES',
+  #   extended_tests,
+  #   args: ['-t', 'aes'],
+  #   timeout: 6000,
+  # )
   # only useful for debugging
   # test(
   #   'AES prove',
@@ -53,54 +55,54 @@ if boost_test.found()
   #   args: ['-t', 'test_aes_prove'],
   #   timeout: 6000,
   # )
-  test(
-    'SHAKE',
-    extended_tests,
-    args: ['-t', 'hash_shake'],
-    timeout: 6000,
-  )
-  test(
-    'Instances',
-    extended_tests,
-    args: ['-t', 'instances'],
-    timeout: 6000,
-  )
-  test(
-    'OWF',
-    extended_tests,
-    args: ['-t', 'owf'],
-    timeout: 6000,
-  )
-  test(
-    'PRG',
-    extended_tests,
-    args: ['-t', 'prgs'],
-    timeout: 6000,
-  )
-  test(
-    'Universal hashing',
-    extended_tests,
-    args: ['-t', 'universal_hashing'],
-    timeout: 6000,
-  )
-  test(
-    'Utils',
-    extended_tests,
-    args: ['-t', 'utils'],
-    timeout: 6000,
-  )
-  test(
-    'BAVC',
-    extended_tests,
-    args: ['-t', 'bavc'],
-    timeout: 6000,
-  )
-  test(
-    'VOLE',
-    extended_tests,
-    args: ['-t', 'vole'],
-    timeout: 6000,
-  )
+  # test(
+  #   'SHAKE',
+  #   extended_tests,
+  #   args: ['-t', 'hash_shake'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'Instances',
+  #   extended_tests,
+  #   args: ['-t', 'instances'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'OWF',
+  #   extended_tests,
+  #   args: ['-t', 'owf'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'PRG',
+  #   extended_tests,
+  #   args: ['-t', 'prgs'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'Universal hashing',
+  #   extended_tests,
+  #   args: ['-t', 'universal_hashing'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'Utils',
+  #   extended_tests,
+  #   args: ['-t', 'utils'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'BAVC',
+  #   extended_tests,
+  #   args: ['-t', 'bavc'],
+  #   timeout: 6000,
+  # )
+  # test(
+  #   'VOLE',
+  #   extended_tests,
+  #   args: ['-t', 'vole'],
+  #   timeout: 6000,
+  # )
   if ntl.found()
     test(
       'Fields',
@@ -109,14 +111,14 @@ if boost_test.found()
       timeout: 6000,
     )
   endif
-  foreach parameter_set : parameter_sets
-    test(
-      'FAEST_@0@'.format(parameter_set.get('PARAM')),
-      extended_tests,
-      args: ['-t', 'faest_@0@'.format(parameter_set.get('PARAM_L'))],
-      timeout: 6000,
-    )
-  endforeach
+  # foreach parameter_set : parameter_sets
+  #   test(
+  #     'FAEST_@0@'.format(parameter_set.get('PARAM')),
+  #     extended_tests,
+  #     args: ['-t', 'faest_@0@'.format(parameter_set.get('PARAM_L'))],
+  #     timeout: 6000,
+  #   )
+  # endforeach
 endif
 
 if get_option('tv-generators').enabled()

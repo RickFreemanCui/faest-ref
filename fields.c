@@ -26,6 +26,8 @@
 #define bf576_modulus (UINT64_C((1 << 13) | (1 << 4) | (1 << 3) | 1))
 // GF(2^768) with X^768 + X^19 + X^17 + X^4 + 1
 #define bf768_modulus (UINT64_C((1 << 19) | (1 << 17) | (1 << 4) | 1))
+// GF(2^512) with x^512 + x^8 + x^5 + x^2 + 1
+#define bf512_modulus (UINT64_C((1 << 8) | (1 << 5) | (1 << 2) | 1))
 
 #define U64C(x0, x1, x2, x3, x4, x5, x6, x7)                                                       \
   ((UINT64_C(x7) << 56) | (UINT64_C(x6) << 48) | (UINT64_C(x5) << 40) | (UINT64_C(x4) << 32) |     \
@@ -1033,3 +1035,27 @@ bf768_t bf768_mul_256(bf768_t lhs, bf256_t rhs) {
   }
   return result;
 }
+
+ATTR_PURE bf512_t bf512_byte_combine(const bf512_t* x);
+ATTR_PURE bf512_t bf512_byte_combine_bits(uint8_t x);
+bf512_t bf512_rand(void);
+
+bf512_t bf512_mul(bf512_t lhs, bf512_t rhs) {
+    bf512_t result = bf512_and_64(lhs, bf512_bit_to_uint64_mask(rhs, 0));
+    for (unsigned int idx = 1; idx != 512; ++idx) {
+      const uint64_t mask = bf512_bit_to_uint64_mask(lhs, 512 - 1);
+      lhs                 = bf512_shift_left_1(lhs);
+
+      BF_VALUE(lhs, 0) ^= mask & bf512_modulus;
+
+  
+      result = bf512_add(result, bf512_and_64(lhs, bf512_bit_to_uint64_mask(rhs, idx)));
+    }
+    return result;
+  }
+
+
+ATTR_CONST bf512_t bf512_mul_64(bf512_t lhs, bf64_t rhs);
+ATTR_CONST bf512_t bf512_mul_bit(bf512_t lhs, uint8_t rhs);
+ATTR_PURE bf512_t bf512_sum_poly(const bf512_t* xs);
+ATTR_PURE bf512_t bf512_sum_poly_bits(const uint8_t* xs);

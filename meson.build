@@ -692,25 +692,25 @@ pkg = import('pkgconfig')
 pkg.generate(name: 'faest', description: 'FAEST signature scheme', libraries: [libfaest])
 
 # SUPERCOP / NIST files
-all_names = []
-foreach parameter_set : parameter_sets
-  all_names += 'faest_@0@'.format(parameter_set.get('PARAM_L'))
-  subdir('faest_@0@'.format(parameter_set.get('PARAM_L')))
-endforeach
-run_target(
-  'prepare_nist',
-  command: [
-    python,
-    [
-      join_paths(meson.project_source_root(), 'tools', 'prepare_nist.py'),
-      meson.project_source_root(),
-      meson.project_build_root(),
-      join_paths(meson.project_build_root(), 'submission'),
-    ]
-    + all_names,
-  ],
+# all_names = []
+# foreach parameter_set : parameter_sets
+#   all_names += 'faest_@0@'.format(parameter_set.get('PARAM_L'))
+#   subdir('faest_@0@'.format(parameter_set.get('PARAM_L')))
+# endforeach
+# run_target(
+#   'prepare_nist',
+#   command: [
+#     python,
+#     [
+#       join_paths(meson.project_source_root(), 'tools', 'prepare_nist.py'),
+#       meson.project_source_root(),
+#       meson.project_build_root(),
+#       join_paths(meson.project_build_root(), 'submission'),
+#     ]
+#     + all_names,
+#   ],
 
-)
+# )
 
 subdir('doc')
 subdir('tests')
