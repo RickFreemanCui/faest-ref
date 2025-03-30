@@ -28,6 +28,8 @@
 #define bf768_modulus (UINT64_C((1 << 19) | (1 << 17) | (1 << 4) | 1))
 // GF(2^512) with x^512 + x^8 + x^5 + x^2 + 1
 #define bf512_modulus (UINT64_C((1 << 8) | (1 << 5) | (1 << 2) | 1))
+// GF(2^320) with x^320 + x^4 + x^3 + x + 1
+#define bf320_modulus (UINT64_C((1 << 4) | (1 << 3) | (1 << 1) | 1))
 
 #define U64C(x0, x1, x2, x3, x4, x5, x6, x7)                                                       \
   ((UINT64_C(x7) << 56) | (UINT64_C(x6) << 48) | (UINT64_C(x5) << 40) | (UINT64_C(x4) << 32) |     \
@@ -1036,7 +1038,7 @@ bf768_t bf768_mul_256(bf768_t lhs, bf256_t rhs) {
   return result;
 }
 
-// GF(2^ 512)
+// GF(2^512)
 static inline bf512_t bf512_and_64(bf512_t lhs, bf64_t rhs) {
   for (unsigned int i = 0; i != ARRAY_SIZE(lhs.values); ++i) {
     lhs.values[i] &= rhs;
@@ -1130,6 +1132,105 @@ bf512_t bf512_sum_poly_bits(const uint8_t* xs) {
   bf512_t ret = bf512_from_bit(ptr_get_bit(xs, 512 - 1));
   for (size_t i = 1; i < 512; ++i) {
     ret = bf512_add(bf512_dbl(ret), bf512_from_bit(ptr_get_bit(xs, 512 - 1 - i)));
+  }
+  return ret;
+}
+
+
+
+
+
+// GF(2^320)
+static inline bf320_t bf320_and_64(bf320_t lhs, bf64_t rhs) {
+  for (unsigned int i = 0; i != ARRAY_SIZE(lhs.values); ++i) {
+    lhs.values[i] &= rhs;
+  }
+  return lhs;
+}
+
+
+static inline bf320_t bf320_shift_left_1(bf320_t value) {
+  value.values[4] = (value.values[4] << 1) | (value.values[3] >> 63);
+  value.values[3] = (value.values[3] << 1) | (value.values[2] >> 63);
+  value.values[2] = (value.values[2] << 1) | (value.values[1] >> 63);
+  value.values[1] = (value.values[1] << 1) | (value.values[0] >> 63);
+  value.values[0] = value.values[0] << 1;
+  return value;
+}
+
+
+bf320_t bf320_rand(void) {
+  uint8_t buf[BF320_NUM_BYTES];
+  rand_bytes(buf, sizeof(buf));
+  return bf320_load(buf);
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline uint64_t bf320_bit_to_uint64_mask(bf320_t value,
+                                                                              unsigned int bit) {
+  const unsigned int byte_idx = bit / 64;
+  const unsigned int bit_idx  = bit % 64;
+
+  return -((BF_VALUE(value, byte_idx) >> bit_idx) & 1);
+}
+
+
+
+bf320_t bf320_mul(bf320_t lhs, bf320_t rhs) {
+    bf320_t result = bf320_and_64(lhs, bf320_bit_to_uint64_mask(rhs, 0));
+    for (unsigned int idx = 1; idx != 320; ++idx) {
+      const uint64_t mask = bf320_bit_to_uint64_mask(lhs, 320 - 1);
+      lhs                 = bf320_shift_left_1(lhs);
+
+      BF_VALUE(lhs, 0) ^= mask & bf320_modulus;
+
+  
+      result = bf320_add(result, bf320_and_64(lhs, bf320_bit_to_uint64_mask(rhs, idx)));
+    }
+    return result;
+  }
+
+
+bf320_t bf320_mul_64(bf320_t lhs, bf64_t rhs) {
+  bf320_t result = bf320_and_64(lhs, bf64_bit_to_mask(rhs, 0));
+  for (unsigned int idx = 1; idx != 64; ++idx) {
+    const uint64_t mask = bf320_bit_to_uint64_mask(lhs, 320 - 1);
+    lhs                 = bf320_shift_left_1(lhs);
+    BF_VALUE(lhs, 0) ^= mask & bf320_modulus;
+    result = bf320_add(result, bf320_and_64(lhs, bf64_bit_to_mask(rhs, idx)));
+  }
+  return result;
+}
+
+
+bf320_t bf320_mul_bit(bf320_t lhs, uint8_t rhs) {
+  return bf320_and_64(lhs, -((uint64_t)rhs & 1));
+}
+
+
+
+ATTR_PURE bf320_t bf320_sum_poly(const bf320_t* xs);
+ATTR_PURE bf320_t bf320_sum_poly_bits(const uint8_t* xs);
+
+
+ATTR_CONST static inline bf320_t bf320_dbl(bf320_t lhs) {
+  uint64_t mask = bf320_bit_to_uint64_mask(lhs, 320 - 1);
+  lhs           = bf320_shift_left_1(lhs);
+  BF_VALUE(lhs, 0) ^= mask & bf320_modulus;
+  return lhs;
+}
+
+bf320_t bf320_sum_poly(const bf320_t* xs) {
+  bf320_t ret = xs[320 - 1];
+  for (size_t i = 1; i < 320; ++i) {
+    ret = bf320_add(bf320_dbl(ret), xs[320 - 1 - i]);
+  }
+  return ret;
+}
+
+bf320_t bf320_sum_poly_bits(const uint8_t* xs) {
+  bf320_t ret = bf320_from_bit(ptr_get_bit(xs, 320 - 1));
+  for (size_t i = 1; i < 320; ++i) {
+    ret = bf320_add(bf320_dbl(ret), bf320_from_bit(ptr_get_bit(xs, 320 - 1 - i)));
   }
   return ret;
 }

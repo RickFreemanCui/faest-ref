@@ -548,6 +548,272 @@ namespace {
                   BF_VALUE(value, 1) % BF_VALUE(value, 0);
     return stream;
   }
+
+
+  class bf512 {
+    bf512_t value;
+
+  public:
+    typedef std::array<uint8_t, BF512_NUM_BYTES> bytes;
+
+    bf512() : value{0} {}
+    bf512(uint64_t v) : value{bf512_from_bf64(v)} {}
+    bf512(bf512_t v) : value{v} {}
+    bf512(bf64 v) : value{bf512_from_bf64(v.as_internal())} {}
+    bf512(const bytes& b) : value{bf512_load(b.data())} {}
+    bf512(const bf512&) = default;
+
+    bf512& operator=(const bf512&) = default;
+
+    bf512& operator+=(bf512 other) {
+      value = bf512_add(value, other.value);
+      return *this;
+    }
+
+    bf512& operator-=(bf512 other) {
+      return *this += other;
+    }
+
+    bf512& operator*=(bf512 other) {
+      value = bf512_mul(value, other.value);
+      return *this;
+    }
+
+    bf512 operator+(bf512 other) const {
+      return {bf512_add(value, other.value)};
+    }
+
+    bf512 operator-(bf512 other) const {
+      return *this + other;
+    }
+
+    bf512 operator*(bf512 other) const {
+      return {bf512_mul(value, other.value)};
+    }
+
+    bf512 operator*(bf64 other) const {
+      return {bf512_mul_64(value, other.as_internal())};
+    }
+
+    bool operator==(bf512 other) const {
+      return BF_VALUE(value, 0) == BF_VALUE(other.value, 0) &&
+             BF_VALUE(value, 1) == BF_VALUE(other.value, 1) &&
+             BF_VALUE(value, 2) == BF_VALUE(other.value, 2) &&
+             BF_VALUE(value, 3) == BF_VALUE(other.value, 3) &&
+             BF_VALUE(value, 4) == BF_VALUE(other.value, 4) &&
+             BF_VALUE(value, 5) == BF_VALUE(other.value, 5) &&
+             BF_VALUE(value, 6) == BF_VALUE(other.value, 6) &&
+             BF_VALUE(value, 7) == BF_VALUE(other.value, 7);
+    }
+
+#if defined(HAVE_NTL)
+    GF2X as_ntl() const {
+      GF2X ret;
+      auto v = BF_VALUE(value, 0);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i, v & 1);
+      }
+      v = BF_VALUE(value, 1);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 64, v & 1);
+      }
+      v = BF_VALUE(value, 2);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 128, v & 1);
+      }
+      v = BF_VALUE(value, 3);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 192, v & 1);
+      }
+      v = BF_VALUE(value, 4);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 256, v & 1);
+      }
+      v = BF_VALUE(value, 5);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 320, v & 1);
+      }
+      v = BF_VALUE(value, 6);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 384, v & 1);
+      }
+      v = BF_VALUE(value, 7);
+      for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+        SetCoeff(ret, i + 448, v & 1);
+      }
+      return ret;
+    }
+#endif
+
+    bf512_t as_internal() const {
+      return value;
+    }
+
+    bytes as_uint8() const {
+      bytes ret;
+      bf512_store(ret.data(), value);
+      return ret;
+    }
+
+
+#if defined(HAVE_NTL)
+    static GF2X ntl_residue() {
+      GF2X residue;
+      SetCoeff(residue, 512);
+      SetCoeff(residue, 8);
+      SetCoeff(residue, 5);
+      SetCoeff(residue, 2);
+      SetCoeff(residue, 0);
+      return residue;
+    }
+#endif
+
+    static bf512 random() {
+      return bf512_rand();
+    }
+
+    static bf512 zero() {
+      return bf512_zero();
+    }
+
+    static bf512 one() {
+      return bf512_one();
+    }
+  };
+
+  static inline std::ostream& operator<<(std::ostream& stream, bf512 v) {
+    const auto value = v.as_internal();
+    stream << boost::format("%08x %08x %08x %08x %08x %08x %08x %08x") % BF_VALUE(value, 7) % BF_VALUE(value, 6) %
+    BF_VALUE(value, 5) % BF_VALUE(value, 4) % BF_VALUE(value, 3) % BF_VALUE(value, 2) %
+                  BF_VALUE(value, 1) % BF_VALUE(value, 0);
+    return stream;
+  }
+
+
+
+class bf320 {
+  bf320_t value;
+
+public:
+  typedef std::array<uint8_t, BF320_NUM_BYTES> bytes;
+
+  bf320() : value{0} {}
+  bf320(uint64_t v) : value{bf320_from_bf64(v)} {}
+  bf320(bf320_t v) : value{v} {}
+  bf320(bf64 v) : value{bf320_from_bf64(v.as_internal())} {}
+  bf320(const bytes& b) : value{bf320_load(b.data())} {}
+  bf320(const bf320&) = default;
+
+  bf320& operator=(const bf320&) = default;
+
+  bf320& operator+=(bf320 other) {
+    value = bf320_add(value, other.value);
+    return *this;
+  }
+
+  bf320& operator-=(bf320 other) {
+    return *this += other;
+  }
+
+  bf320& operator*=(bf320 other) {
+    value = bf320_mul(value, other.value);
+    return *this;
+  }
+
+  bf320 operator+(bf320 other) const {
+    return {bf320_add(value, other.value)};
+  }
+
+  bf320 operator-(bf320 other) const {
+    return *this + other;
+  }
+
+  bf320 operator*(bf320 other) const {
+    return {bf320_mul(value, other.value)};
+  }
+
+  bf320 operator*(bf64 other) const {
+    return {bf320_mul_64(value, other.as_internal())};
+  }
+
+  bool operator==(bf320 other) const {
+    return BF_VALUE(value, 0) == BF_VALUE(other.value, 0) &&
+           BF_VALUE(value, 1) == BF_VALUE(other.value, 1) &&
+           BF_VALUE(value, 2) == BF_VALUE(other.value, 2) &&
+           BF_VALUE(value, 3) == BF_VALUE(other.value, 3) &&
+           BF_VALUE(value, 4) == BF_VALUE(other.value, 4);
+  }
+
+#if defined(HAVE_NTL)
+  GF2X as_ntl() const {
+    GF2X ret;
+    auto v = BF_VALUE(value, 0);
+    for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+      SetCoeff(ret, i, v & 1);
+    }
+    v = BF_VALUE(value, 1);
+    for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+      SetCoeff(ret, i + 64, v & 1);
+    }
+    v = BF_VALUE(value, 2);
+    for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+      SetCoeff(ret, i + 128, v & 1);
+    }
+    v = BF_VALUE(value, 3);
+    for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+      SetCoeff(ret, i + 192, v & 1);
+    }
+    v = BF_VALUE(value, 4);
+    for (unsigned int i = 0; i != sizeof(v) * 8 && v; ++i, v >>= 1) {
+      SetCoeff(ret, i + 256, v & 1);
+    }
+    return ret;
+  }
+#endif
+
+  bf320_t as_internal() const {
+    return value;
+  }
+
+  bytes as_uint8() const {
+    bytes ret;
+    bf320_store(ret.data(), value);
+    return ret;
+  }
+
+
+#if defined(HAVE_NTL)
+  static GF2X ntl_residue() {
+    GF2X residue;
+    SetCoeff(residue, 320);
+    SetCoeff(residue, 4);
+    SetCoeff(residue, 3);
+    SetCoeff(residue, 1);
+    SetCoeff(residue, 0);
+    return residue;
+  }
+#endif
+
+  static bf320 random() {
+    return bf320_rand();
+  }
+
+  static bf320 zero() {
+    return bf320_zero();
+  }
+
+  static bf320 one() {
+    return bf320_one();
+  }
+};
+
+static inline std::ostream& operator<<(std::ostream& stream, bf320 v) {
+  const auto value = v.as_internal();
+  stream << boost::format("%08x %08x %08x %08x %08x") % BF_VALUE(value, 4) % BF_VALUE(value, 3) % BF_VALUE(value, 2) %
+                BF_VALUE(value, 1) % BF_VALUE(value, 0);
+  return stream;
+}
+
 } // namespace
 
 #endif

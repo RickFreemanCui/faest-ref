@@ -9,7 +9,7 @@ if fs.is_dir('/opt/homebrew/opt/ntl/lib')
 endif
 
 boost_test = dependency('boost', required: false, modules: ['unit_test_framework'])
-ntl = cpp.find_library('ntl', dirs: mydirs, required: true, has_headers: ['NTL/version.h'], header_include_directories: myincs)
+ntl = cc.find_library('ntl', dirs: mydirs, required: false, has_headers: ['NTL/version.h'], header_include_directories: myincs)
 
 if boost_test.found()
   test_sources = files(

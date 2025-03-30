@@ -78,6 +78,10 @@ typedef struct {
 } bf256_t;
 
 typedef struct {
+  uint64_t values[5];
+} bf320_t;
+
+typedef struct {
   uint64_t values[6];
 } bf384_t;
 
@@ -105,6 +109,10 @@ typedef struct {
   {                                                                                                \
     { x0, x1, x2, x3 }                                                                             \
   }
+#define BF320C(x0, x1, x2, x3, x4)                                                             \
+  {                                                                                                \
+    { x0, x1, x2, x3, x4 }                                                                     \
+  }
 #define BF384C(x0, x1, x2, x3, x4, x5)                                                             \
   {                                                                                                \
     { x0, x1, x2, x3, x4, x5 }                                                                     \
@@ -128,12 +136,14 @@ typedef struct {
 #define BF128_ALIGN 8
 #define BF192_ALIGN 8
 #define BF256_ALIGN 8
+#define BF320_ALIGN 8
 #define BF512_ALIGN 8
 #endif
 
 #define BF128_NUM_BYTES (128 / 8)
 #define BF192_NUM_BYTES (192 / 8)
 #define BF256_NUM_BYTES (256 / 8)
+#define BF320_NUM_BYTES (320 / 8)
 #define BF384_NUM_BYTES (384 / 8)
 #define BF512_NUM_BYTES (512 / 8)
 #define BF576_NUM_BYTES (576 / 8)
@@ -465,6 +475,77 @@ ATTR_CONST bf256_t bf256_mul_bit(bf256_t lhs, uint8_t rhs);
 #endif
 ATTR_PURE bf256_t bf256_sum_poly(const bf256_t* xs);
 ATTR_PURE bf256_t bf256_sum_poly_bits(const uint8_t* xs);
+
+
+// GF(2^320) implementation
+
+ATTR_PURE ATTR_ALWAYS_INLINE static inline bf320_t bf320_load(const uint8_t* src) {
+  bf320_t ret;
+#if defined(FAEST_IS_BIG_ENDIAN)
+  for (unsigned int i = 0; i != BF320_NUM_BYTES / sizeof(uint64_t); ++i, src += sizeof(uint64_t)) {
+    memcpy(&BF_VALUE(ret, i), src, sizeof(uint64_t));
+    BF_VALUE(ret, i) = le64toh(BF_VALUE(ret, i));
+  }
+#else
+  memcpy(&ret, src, BF320_NUM_BYTES);
+#endif
+  return ret;
+}
+
+ATTR_ALWAYS_INLINE static inline void bf320_store(uint8_t* dst, bf320_t src) {
+#if defined(FAEST_IS_BIG_ENDIAN)
+  for (unsigned int i = 0; i != BF320_NUM_BYTES / sizeof(uint64_t); ++i, dst += sizeof(uint64_t)) {
+    uint64_t tmp = htole64(BF_VALUE(src, i));
+    memcpy(dst, &tmp, sizeof(tmp));
+  }
+#else
+  memcpy(dst, &src, BF320_NUM_BYTES);
+#endif
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline bf320_t bf320_from_bf64(bf64_t src) {
+  bf320_t ret      = BF320C(0, 0, 0, 0, 0);
+  BF_VALUE(ret, 0) = src;
+  return ret;
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline bf320_t bf320_from_bf8(bf8_t src) {
+  bf320_t ret      = BF320C(0, 0, 0, 0, 0);
+  BF_VALUE(ret, 0) = src;
+  return ret;
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline bf320_t bf320_from_bit(uint8_t bit) {
+  return bf320_from_bf8(bit & 1);
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline bf320_t bf320_zero(void) {
+  const bf320_t ret = BF320C(0, 0, 0, 0, 0);
+  return ret;
+}
+
+ATTR_CONST ATTR_ALWAYS_INLINE static inline bf320_t bf320_one(void) {
+  const bf320_t ret = BF320C(1, 0, 0, 0, 0);
+  return ret;
+}
+
+bf320_t bf320_rand(void);
+
+ATTR_CONST static inline bf320_t bf320_add(bf320_t lhs, bf320_t rhs) {
+  for (unsigned int i = 0; i != ARRAY_SIZE(lhs.values); ++i) {
+    lhs.values[i] ^= rhs.values[i];
+  }
+  return lhs;
+}
+
+
+ATTR_CONST bf320_t bf320_mul(bf320_t lhs, bf320_t rhs);
+ATTR_CONST bf320_t bf320_mul_64(bf320_t lhs, bf64_t rhs);
+ATTR_CONST bf320_t bf320_mul_bit(bf320_t lhs, uint8_t rhs);
+ATTR_PURE bf320_t bf320_sum_poly(const bf320_t* xs);
+ATTR_PURE bf320_t bf320_sum_poly_bits(const uint8_t* xs);
+
+
 
 // GF(2^384) implementation
 

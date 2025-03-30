@@ -234,6 +234,50 @@ BOOST_AUTO_TEST_CASE(test_bf256_mul_random) {
 }
 #endif
 
+
+BOOST_AUTO_TEST_CASE(test_bf320_add_invariants) {
+  add_invariants<bf320>();
+}
+
+#if defined(HAVE_NTL)
+BOOST_AUTO_TEST_CASE(test_bf320_add_random) {
+  add_random<bf320>();
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(test_bf320_mul_invariants) {
+  mul_invariants<bf320>();
+}
+
+#if defined(HAVE_NTL)
+BOOST_AUTO_TEST_CASE(test_bf320_mul_random) {
+  mul_random<bf320>();
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(test_bf512_add_invariants) {
+  add_invariants<bf512>();
+}
+
+#if defined(HAVE_NTL)
+BOOST_AUTO_TEST_CASE(test_bf512_add_random) {
+  add_random<bf512>();
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(test_bf512_mul_invariants) {
+  mul_invariants<bf512>();
+}
+
+#if defined(HAVE_NTL)
+BOOST_AUTO_TEST_CASE(test_bf512_mul_random) {
+  mul_random<bf512>();
+}
+#endif
+
+
+
+
 BOOST_AUTO_TEST_CASE(test_bf64_test_vectors) {
   constexpr bf64::bytes lhs{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
   constexpr bf64::bytes rhs{0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01};
