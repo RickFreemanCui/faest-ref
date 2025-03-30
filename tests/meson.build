@@ -1,7 +1,10 @@
+fs = import('fs')
 myincs = []
 mydirs = []
-if host_machine.system() == 'macos'
+if fs.is_dir('/opt/homebrew/opt/ntl/include')
   myincs += include_directories('/opt/homebrew/opt/ntl/include')
+endif
+if fs.is_dir('/opt/homebrew/opt/ntl/lib')
   mydirs += '/opt/homebrew/opt/ntl/lib'
 endif
 
