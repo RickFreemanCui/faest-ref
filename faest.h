@@ -17,5 +17,6 @@
 #include "faest_em_192s.h"
 #include "faest_em_256f.h"
 #include "faest_em_256s.h"
+#include "rsd_320f.h"
 
 #endif

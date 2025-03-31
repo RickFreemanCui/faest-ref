@@ -142,6 +142,41 @@ void vole_hash_256(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int
   xor_u8_array(h, x1, h, BF256_NUM_BYTES + UNIVERSAL_HASH_B);
 }
 
+void vole_hash_320(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell) {
+  const uint8_t* r0 = sd;
+  const uint8_t* r1 = sd + 1 * BF320_NUM_BYTES;
+  const uint8_t* r2 = sd + 2 * BF320_NUM_BYTES;
+  const uint8_t* r3 = sd + 3 * BF320_NUM_BYTES;
+  const uint8_t* s  = sd + 4 * BF320_NUM_BYTES;
+  const uint8_t* t  = sd + 5 * BF320_NUM_BYTES;
+  const uint8_t* x1 = x + (ell + 2 * BF320_NUM_BYTES * 8) / 8;
+
+  const unsigned int length_lambda = (ell + 3 * BF320_NUM_BYTES * 8 - 1) / (BF320_NUM_BYTES * 8);
+
+  uint8_t tmp[BF320_NUM_BYTES] = {0};
+  memcpy(tmp, x + (length_lambda - 1) * BF320_NUM_BYTES,
+         (ell + BF320_NUM_BYTES * 8) % (BF320_NUM_BYTES * 8) == 0
+             ? BF320_NUM_BYTES
+             : ((ell + BF320_NUM_BYTES * 8) % (BF320_NUM_BYTES * 8)) / 8);
+  bf320_t h0 = bf320_load(tmp);
+
+  const bf320_t b_s = bf320_load(s);
+  bf320_t running_s = b_s;
+  for (unsigned int i = 1; i != length_lambda; ++i, running_s = bf320_mul(running_s, b_s)) {
+    h0 = bf320_add(h0,
+                   bf320_mul(running_s, bf320_load(x + (length_lambda - 1 - i) * BF320_NUM_BYTES)));
+  }
+
+  bf64_t h1  = compute_h1(t, x, BF320_NUM_BYTES * 8, ell);
+  bf320_t h2 = bf320_add(bf320_mul(bf320_load(r0), h0), bf320_mul_64(bf320_load(r1), h1));
+  bf320_t h3 = bf320_add(bf320_mul(bf320_load(r2), h0), bf320_mul_64(bf320_load(r3), h1));
+
+  bf320_store(h, h2);
+  bf320_store(tmp, h3);
+  memcpy(h + BF320_NUM_BYTES, tmp, UNIVERSAL_HASH_B);
+  xor_u8_array(h, x1, h, BF320_NUM_BYTES + UNIVERSAL_HASH_B);
+}
+
 void vole_hash(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell, uint32_t lambda) {
   switch (lambda) {
   case 256:
@@ -149,6 +184,9 @@ void vole_hash(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell
     break;
   case 192:
     vole_hash_192(h, sd, x, ell);
+    break;
+  case 320:
+    vole_hash_320(h, sd, x, ell);
     break;
   default:
     vole_hash_128(h, sd, x, ell);
@@ -353,6 +391,72 @@ void zk_hash_256_3_finalize(uint8_t* h_0, uint8_t* h_1, uint8_t* h_2, zk_hash_25
   bf256_store(h_2,
               bf256_add(bf256_add(bf256_mul(r0, ctx->h0[2]), bf256_mul(r1, ctx->h1[2])), x1_2));
 }
+
+
+void zk_hash_320_3_init(zk_hash_320_3_ctx* ctx, const uint8_t* sd) {
+  const uint8_t* s = sd + 2 * BF320_NUM_BYTES;
+  const uint8_t* t = sd + 3 * BF320_NUM_BYTES;
+
+  ctx->h0[0] = bf320_zero();
+  ctx->h0[1] = bf320_zero();
+  ctx->h0[2] = bf320_zero();
+  ctx->h1[0] = bf320_zero();
+  ctx->h1[1] = bf320_zero();
+  ctx->h1[2] = bf320_zero();
+  ctx->s     = bf320_load(s);
+  ctx->t     = bf64_load(t);
+  ctx->sd    = sd;
+}
+
+void zk_hash_320_3_update(zk_hash_320_3_ctx* ctx, bf320_t v_0, bf320_t v_1, bf320_t v_2) {
+  ctx->h0[0] = bf320_add(bf320_mul(ctx->h0[0], ctx->s), v_0);
+  ctx->h1[0] = bf320_add(bf320_mul_64(ctx->h1[0], ctx->t), v_0);
+  ctx->h0[1] = bf320_add(bf320_mul(ctx->h0[1], ctx->s), v_1);
+  ctx->h1[1] = bf320_add(bf320_mul_64(ctx->h1[1], ctx->t), v_1);
+  ctx->h0[2] = bf320_add(bf320_mul(ctx->h0[2], ctx->s), v_2);
+  ctx->h1[2] = bf320_add(bf320_mul_64(ctx->h1[2], ctx->t), v_2);
+}
+
+void zk_hash_320_3_finalize(uint8_t* h_0, uint8_t* h_1, uint8_t* h_2, zk_hash_320_3_ctx* ctx,
+                            bf320_t x1_0, bf320_t x1_1, bf320_t x1_2) {
+  const bf320_t r0 = bf320_load(ctx->sd);
+  const bf320_t r1 = bf320_load(ctx->sd + BF320_NUM_BYTES);
+
+  bf320_store(h_0,
+              bf320_add(bf320_add(bf320_mul(r0, ctx->h0[0]), bf320_mul(r1, ctx->h1[0])), x1_0));
+  bf320_store(h_1,
+              bf320_add(bf320_add(bf320_mul(r0, ctx->h0[1]), bf320_mul(r1, ctx->h1[1])), x1_1));
+  bf320_store(h_2,
+              bf320_add(bf320_add(bf320_mul(r0, ctx->h0[2]), bf320_mul(r1, ctx->h1[2])), x1_2));
+}
+
+void zk_hash_320_init(zk_hash_320_ctx* ctx, const uint8_t* sd) {
+  const uint8_t* s = sd + 2 * BF320_NUM_BYTES;
+  const uint8_t* t = sd + 3 * BF320_NUM_BYTES;
+
+  ctx->h0 = bf320_zero();
+  ctx->h1 = bf320_zero();
+  ctx->s  = bf320_load(s);
+  ctx->t  = bf64_load(t);
+  ctx->sd = sd;
+}
+
+void zk_hash_320_update(zk_hash_320_ctx* ctx, bf320_t v) {
+  ctx->h0 = bf320_add(bf320_mul(ctx->h0, ctx->s), v);
+  ctx->h1 = bf320_add(bf320_mul_64(ctx->h1, ctx->t), v);
+}
+
+void zk_hash_320_finalize(uint8_t* h, zk_hash_320_ctx* ctx, bf320_t x1) {
+  const uint8_t* r0 = ctx->sd;
+  const uint8_t* r1 = ctx->sd + BF320_NUM_BYTES;
+
+  bf320_store(h, bf320_add(bf320_add(bf320_mul(bf320_load(r0), ctx->h0),
+                                     bf320_mul(bf320_load(r1), ctx->h1)),
+                           x1));
+}
+
+
+
 
 #if defined(FAEST_TESTS)
 void zk_hash_128(uint8_t* h, const uint8_t* sd, const bf128_t* x, unsigned int ell) {

@@ -17,4 +17,13 @@ void faest_sign(uint8_t* sig, const uint8_t* msg, size_t msglen, const uint8_t* 
 int faest_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const uint8_t* owf_input,
                  const uint8_t* owf_output, const faest_paramset_t* params);
 
+
+// ReSolveD
+void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msglen, const uint8_t* owf_key,
+    const uint8_t* owf_input, const uint8_t* owf_output, const uint8_t* witness,
+    const uint8_t* rho, size_t rholen, const resolved_paramset_t* params);
+
+int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const uint8_t* owf_input,
+     const uint8_t* owf_output, const resolved_paramset_t* params);
+
 #endif

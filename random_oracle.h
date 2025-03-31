@@ -69,6 +69,39 @@ void H4_init(H4_context_t* ctx, unsigned int security_param);
 void H4_update(H4_context_t* ctx, const uint8_t* pre_iv);
 void H4_final(H4_context_t* ctx, uint8_t* iv);
 
+
+
+// implementation for H_mat
+
+typedef hash_context H_mat_context_t;
+
+void H_mat_init(H_mat_context_t* ctx, unsigned int security_param);
+void H_mat_update(H_mat_context_t* ctx, const uint8_t* src, size_t len);
+void H_mat_final(H_mat_context_t* ctx, uint8_t* digest, size_t len);
+
+uint8_t* generate_H_mat(int n,int m,const uint8_t* seed,int lambda);
+
+int getH(int i,int j,int n,int m,const uint8_t *buffer);
+
+// implementation for H_e
+
+typedef hash_context H_e_context_t;
+
+void H_e_init(H_e_context_t* ctx, unsigned int security_param);
+void H_e_update(H_e_context_t* ctx, const uint8_t* src, size_t len);
+void H_e_final(H_e_context_t* ctx, uint8_t* digest, size_t len);
+
+void generate_e(uint8_t *buffer,int m,int w,int d,const uint8_t* seed,int lambda);
+
+
+typedef hash_context H_c_context_t;
+
+void H_c_init(H_c_context_t* ctx, unsigned int security_param);
+void H_c_update(H_c_context_t* ctx, const uint8_t* src, size_t len);
+void H_c_final(H_c_context_t* ctx, uint8_t* digest, size_t len);
+
+
+
 FAEST_END_C_DECL
 
 #endif

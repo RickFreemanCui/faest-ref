@@ -107,3 +107,57 @@ const faest_paramset_t* faest_get_paramset(faest_paramid_t paramid) {
     return NULL;
   }
 }
+
+// ReSolveD Parameter Implementation
+
+const char* resolved_get_param_name(resolved_paramid_t paramid) {
+  switch (paramid) {
+  case PARAMETER_SET_INVALID:
+    return "RESOLVED_PARAMETER_SET_INVALID";
+  case RESOLVED_320F:
+    return "RESOLVED_320F";
+  case RESOLVED_512F:
+    return "RESOLVED_512F";
+  default:
+    return "RESOLVED_PARAMETER_SET_MAX_INDEX";
+  }
+}
+
+
+
+#define RESOLVED_PARAMS(name)                                                                               \
+  {                                                                                                \
+      name##_LAMBDA,                                                                               \
+      name##_TAU,                                                                                  \
+      name##_W_GRIND,                                                                              \
+      name##_T_OPEN,                                                                               \
+      name##_ELL,                                                                                  \
+      CALC_K(name),                                                                                \
+      CALC_TAU0(name),                                                                             \
+      CALC_TAU1(name),                                                                             \
+      CALC_L(name),                                                                                \
+      name##_M,                                                                                  \
+      name##_K,                                                                                  \
+      name##_W,                                                                                    \
+      name##_BLOCK_SIZE,                                                                                    \
+      name##_SIG_SIZE,                                                                             \
+      name##_OWF_INPUT_SIZE,                                                                       \
+      name##_OWF_OUTPUT_SIZE,                                                                      \
+  }
+
+#define RESOLVED_320F_PARAMS RESOLVED_PARAMS(RESOLVED_320F)
+#define RESOLVED_512F_PARAMS RESOLVED_PARAMS(RESOLVED_512F)
+
+#define RESOLVED_CASE_PARAM(P)                                                                              \
+  case P: {                                                                                        \
+    static const resolved_paramset_t params = P##_PARAMS;                                             \
+    return &params;                                                                                \
+  }
+
+const resolved_paramset_t* resolved_get_paramset(resolved_paramid_t paramid) {
+  switch (paramid) {
+    RESOLVED_CASE_PARAM(RESOLVED_320F)
+  default:
+    return NULL;
+  }
+}

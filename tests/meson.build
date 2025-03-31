@@ -41,6 +41,14 @@ if boost_test.found()
     )
   endforeach
 
+  foreach parameter_set : resolved_parameter_sets
+    test_sources += configure_file(
+      input: 'resolved_basic.cpp.in',
+      output: 'resolved_@0@_basic.cpp'.format(parameter_set.get('PARAM_L')),
+      configuration: parameter_set,
+    )
+  endforeach
+
   extended_tests = executable(
     'test_extended_tests',
     test_sources,
@@ -119,14 +127,24 @@ if boost_test.found()
       timeout: 6000,
     )
   endif
-  # foreach parameter_set : parameter_sets
-  #   test(
-  #     'FAEST_@0@'.format(parameter_set.get('PARAM')),
-  #     extended_tests,
-  #     args: ['-t', 'faest_@0@'.format(parameter_set.get('PARAM_L'))],
-  #     timeout: 6000,
-  #   )
-  # endforeach
+  foreach parameter_set : [param_128f, param_em_128f]
+    test(
+      'FAEST_@0@'.format(parameter_set.get('PARAM')),
+      extended_tests,
+      args: ['-t', 'faest_@0@'.format(parameter_set.get('PARAM_L'))],
+      timeout: 6000,
+    )
+  endforeach
+
+  foreach parameter_set : resolved_parameter_sets
+    test(
+      'RESOLVED_@0@'.format(parameter_set.get('PARAM')),
+      extended_tests,
+      args: ['-t', 'resolved_@0@'.format(parameter_set.get('PARAM_L'))],
+      timeout: 6000,
+    )
+  endforeach
+
 endif
 
 if get_option('tv-generators').enabled()

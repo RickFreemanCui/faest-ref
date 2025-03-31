@@ -447,6 +447,28 @@ param_em_256f.set('OWF_INPUT_SIZE', 32)
 param_em_256f.set('OWF_OUTPUT_SIZE', 32)
 parameter_sets += param_em_256f
 
+resolved_parameter_sets = []
+
+# parameter set: ReSolveD-320f
+rsd_320f = configuration_data()
+rsd_320f.set('PARAM', '320F')
+rsd_320f.set('PARAM_L', '320f')
+rsd_320f.set('LAMBDA', 320)
+rsd_320f.set('ELL', 1168)
+rsd_320f.set('TAU', 32)
+rsd_320f.set('W_GRIND', 8)
+rsd_320f.set('T_OPEN', 300)
+rsd_320f.set('SIG_SIZE', 22684)
+rsd_320f.set('PK_SIZE', 172)
+rsd_320f.set('SK_SIZE', 80)
+rsd_320f.set('OWF_INPUT_SIZE', 40)
+rsd_320f.set('OWF_OUTPUT_SIZE', 132)
+rsd_320f.set('M', 3504)
+rsd_320f.set('K', 2452)
+rsd_320f.set('W', 292)
+rsd_320f.set('BLOCK_SIZE', 12)
+resolved_parameter_sets += rsd_320f
+
 # also make data from all parameter sets available "globally"
 parameter_data = configuration_data()
 foreach parameter_set : parameter_sets
@@ -458,6 +480,14 @@ endforeach
 parameter_data.set('FAEST_128_LAMBDA', 128)
 parameter_data.set('FAEST_192_LAMBDA', 192)
 parameter_data.set('FAEST_256_LAMBDA', 256)
+
+foreach parameter_set : resolved_parameter_sets
+  parameter_set_prefix = 'RESOLVED_@0@'.format(parameter_set.get('PARAM'))
+  foreach key : parameter_set.keys()
+    parameter_data.set('@0@_@1@'.format(parameter_set_prefix, key), parameter_set.get(key))
+  endforeach
+endforeach
+parameter_data.set('RESOLVED_320_LAMBDA', 320)
 
 # dependencies
 openssl = dependency('openssl', required: get_option('openssl'))
@@ -534,6 +564,14 @@ faest_aes_256 = configure_file(
   configuration: faest_256_data,
 )
 
+rsd_320_data = configuration_data()
+rsd_320_data.set('SSS', '320')
+rsd_320 = configure_file(
+  output: 'faest_rsd_320.c',
+  input: 'faest_rsd.c.in',
+  configuration: rsd_320_data,
+)
+
 include_directories = [include_directories('.')]
 
 # source files
@@ -555,6 +593,7 @@ faest_sources = files(
   faest_aes_128,
   faest_aes_192,
   faest_aes_256,
+  rsd_320,
 ]
 
 if has_usable_builtin == false
@@ -630,6 +669,22 @@ foreach parameter_set : parameter_sets
     configuration: parameter_set,
   )
 endforeach
+
+
+# generate files for RSD parameter sets
+foreach parameter_set : resolved_parameter_sets
+  headers += configure_file(
+    input: 'resolved_param.h.in',
+    output: 'resolved_@0@.h'.format(parameter_set.get('PARAM_L')),
+    configuration: parameter_set,
+  )
+  faest_sources += configure_file(
+    input: 'resolved_param.c.in',
+    output: 'resolved_@0@.c'.format(parameter_set.get('PARAM_L')),
+    configuration: parameter_set,
+  )
+endforeach
+
 
 # static faest library
 libfaest_no_random_static = static_library(

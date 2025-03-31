@@ -10,6 +10,10 @@
 #include "aes.h"
 #include "utils.h"
 
+// For RSD H mat
+#include "random_oracle.h"
+//
+
 #include <string.h>
 
 #if defined(HAVE_OPENSSL)
@@ -310,3 +314,53 @@ void owf_em_256(const uint8_t* key, const uint8_t* input, uint8_t* output) {
   rijndael256_encrypt_block(&round_keys, key, output);
   xor_u8_array(output, key, output, 32);
 }
+
+
+// input is the public seed for sampling the H matrix
+// key is the private seed for sampling the e vector
+// output is the public vector y = H * e
+bool owf_rsd(const uint8_t* key, const uint8_t* input, uint8_t* output, int lambda) {
+
+  const resolved_paramset_t* paramset =  resolved_get_paramset(lambda == 320 ? RESOLVED_320F : (RESOLVED_512F));
+  const int code_length = paramset->code_length;
+  const int code_dimension = paramset->code_dimension;
+  const int code_noise_weight = paramset->code_noise_weight;
+  const int code_block_size = paramset->code_block_size;
+
+  const int output_len = (code_length - code_dimension + 7) / 8; // Round to byte
+  int ret = 0;  
+
+  memset(output, 0, output_len);
+
+  //generate mat H
+  uint8_t *buffer=generate_H_mat(code_length - code_dimension, code_length, input, lambda);
+
+  uint8_t *e = (uint8_t *)malloc(code_length);
+  generate_e(e,code_length,code_noise_weight,code_block_size,key,lambda);
+
+
+  // y=H*e
+  uint8_t *y = (uint8_t *)malloc(code_length - code_dimension);
+  memset(y,0,code_length - code_dimension);
+  for(int i=0;i<code_length - code_dimension;i++)
+  for(int j=0;j<code_length;j++){
+    y[i] ^= getH(i,j,code_length - code_dimension,code_length,buffer) & e[j];
+  }
+  //pack y into output
+  for(int i=0;i<code_length - code_dimension;i++){
+    output[i/8] ^= (y[i] << (i%8));
+  }
+
+  free(e);
+  free(y);
+  free(buffer); 
+
+  return ret == 0;
+}
+
+
+
+void owf_rsd_320(const uint8_t* key, const uint8_t* input, uint8_t* output) {
+  owf_rsd(key, input, output, 320);
+}
+

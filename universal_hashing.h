@@ -15,6 +15,7 @@ FAEST_BEGIN_C_DECL
 void vole_hash_128(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell);
 void vole_hash_192(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell);
 void vole_hash_256(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell);
+void vole_hash_320(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell);
 void vole_hash(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int ell, uint32_t lambda);
 
 #if defined(FAEST_TESTS)
@@ -106,6 +107,36 @@ void leaf_hash_192(uint8_t* h, const uint8_t* sd, const uint8_t* x);
 void leaf_hash_256(uint8_t* h, const uint8_t* sd, const uint8_t* x);
 void leaf_hash(uint8_t* h, const uint8_t* sd, const uint8_t* x, unsigned int lambda);
 
+
+
+typedef struct {
+  bf320_t h0;
+  bf320_t h1;
+  bf320_t s;
+  bf64_t t;
+  const uint8_t* sd;
+} zk_hash_320_ctx;
+
+void zk_hash_320_init(zk_hash_320_ctx* ctx, const uint8_t* sd);
+void zk_hash_320_update(zk_hash_320_ctx* ctx, bf320_t v);
+void zk_hash_320_finalize(uint8_t* h, zk_hash_320_ctx* ctx, bf320_t x1);
+
+
+typedef struct {
+  bf320_t h0[3];
+  bf320_t h1[3];
+  bf320_t s;
+  bf64_t t;
+  const uint8_t* sd;
+} zk_hash_320_3_ctx;
+
+void zk_hash_320_3_init(zk_hash_320_3_ctx* ctx, const uint8_t* sd);
+void zk_hash_320_3_update(zk_hash_320_3_ctx* ctx, bf320_t v_0, bf320_t v_1, bf320_t v_2);
+void zk_hash_320_3_finalize(uint8_t* h_0, uint8_t* h_1, uint8_t* h_2, zk_hash_320_3_ctx* ctx,
+                            bf320_t x1_0, bf320_t x1_1, bf320_t x1_2);
+
+
+                            
 FAEST_END_C_DECL
 
 #endif

@@ -19,6 +19,8 @@ void owf_em_128(const uint8_t* key, const uint8_t* input, uint8_t* output);
 void owf_em_192(const uint8_t* key, const uint8_t* input, uint8_t* output);
 void owf_em_256(const uint8_t* key, const uint8_t* input, uint8_t* output);
 
+void owf_rsd_320(const uint8_t* key, const uint8_t* input, uint8_t* output);
+
 #define faest_128s_owf owf_128
 #define faest_128f_owf owf_128
 #define faest_192s_owf owf_192
@@ -32,6 +34,8 @@ void owf_em_256(const uint8_t* key, const uint8_t* input, uint8_t* output);
 #define faest_em_192f_owf owf_em_192
 #define faest_em_256s_owf owf_em_256
 #define faest_em_256f_owf owf_em_256
+
+#define resolved_320f_owf owf_rsd_320
 
 FAEST_END_C_DECL
 
