@@ -1708,6 +1708,9 @@ void aes_@SSS@_prover(uint8_t* a0_tilde, uint8_t* a1_tilde, uint8_t* a2_tilde, c
   zk_hash_SSS_3_finalize(a0_tilde, a1_tilde, a2_tilde, &hasher, bf_v_star_0,
                          bfSSS_add(bf_u_star_0, bf_v_star_1), bf_u_star_1);
 
+  bfSSS_t tmp = bfSSS_load(a0_tilde);
+  printf("a0_tilde: %llx %llx\n", tmp.values[0], tmp.values[1]);
+
   faest_aligned_free(w_tag);
 }
 
@@ -1755,6 +1758,8 @@ void aes_@SSS@_verifier(uint8_t* a0_tilde, const uint8_t* d, uint8_t** Q, const 
   bfSSS_t tmp2 = bfSSS_mul(bfSSS_load(a2_tilde), bf_delta_sq);
   bfSSS_t tmp3 = bfSSS_add(tmp1, tmp2);
   bfSSS_t ret  = bfSSS_add(bfSSS_load(q_tilde), tmp3);
+
+  printf("ret: %llx %llx\n", ret.values[0], ret.values[1]);
 
   bfSSS_store(a0_tilde, ret);
 }

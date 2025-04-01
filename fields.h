@@ -7,6 +7,7 @@
 
 #include "macros.h"
 #include "endian_compat.h"
+#include <stdio.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -797,6 +798,13 @@ ATTR_CONST static inline bf768_t bf768_add(bf768_t lhs, bf768_t rhs) {
 #endif
 
 ATTR_CONST bf768_t bf768_mul_256(bf768_t lhs, bf256_t rhs);
+
+ATTR_CONST static inline void print_bf320(const bf320_t x) {
+  for (int i = 0; i != ARRAY_SIZE(x.values); i++) {
+    printf("%llx ", x.values[i]);
+  }
+  printf("\n");
+}
 
 FAEST_END_C_DECL
 

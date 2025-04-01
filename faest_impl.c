@@ -412,7 +412,7 @@ void faest_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8_t*
     uint8_t* chall_3 = signature_chall_3(sig, params);
     hash_challenge_3_final(chall_3, &chall_3_ctx, ctr, lambda);
     // declassify chall_3 which is put into the signature
-    faest_declassify(chall_3, lambda / 8);
+    // faest_declassify(chall_3, lambda / 8);
 
     // ::23
     if (!check_challenge_3(chall_3, lambda - w_grind, lambda)) {
@@ -430,6 +430,13 @@ void faest_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8_t*
       break;
     }
   }
+
+  printf("prover chall3:\n");
+  for (int i = 0; i < params->lambda / 8; i++) {
+    printf("%x ", signature_chall_3(sig, params)[i]);
+  }
+  printf("\n");
+
   hash_clear(&chall_3_ctx);
   bavc_clear(&bavc);
 
@@ -520,6 +527,12 @@ int faest_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const ui
   hash_challenge_3(chall_3, chall_2, a0_tilde, dsignature_a1_tilde(sig, params),
                    dsignature_a2_tilde(sig, params), dsignature_ctr(sig, params), lambda);
 
+  printf("verifier chall3:\n");
+  for (int i = 0; i < params->lambda / 8; i++) {
+    printf("%x ", chall_3[i]);
+  }
+  printf("\n");
+
   // Step 21
   return memcmp(chall_3, dsignature_chall_3(sig, params), lambda_bytes) == 0 ? 0 : -1;
 }
@@ -546,7 +559,8 @@ ATTR_PURE static inline uint8_t* rsd_signature_u_tilde(uint8_t* base_ptr,
   return base_ptr + (params->tau - 1) * ell_hat_bytes;
 }
 
-ATTR_PURE static inline uint8_t* rsd_signature_d(uint8_t* base_ptr, const resolved_paramset_t* params) {
+ATTR_PURE static inline uint8_t* rsd_signature_d(uint8_t* base_ptr,
+                                                 const resolved_paramset_t* params) {
   const unsigned int lambda_bytes  = params->lambda / 8;
   const unsigned int ell_bytes     = params->l / 8;
   const unsigned int ell_hat_bytes = ell_bytes + 3 * lambda_bytes + UNIVERSAL_HASH_B;
@@ -709,8 +723,8 @@ static inline void rsd_verify(uint8_t* a0_tilde, const uint8_t* d, uint8_t** Q,
 
 // RSD.Sign()
 void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8_t* owf_key,
-              const uint8_t* owf_input, const uint8_t* owf_output, const uint8_t* witness,
-              const uint8_t* rho, size_t rholen, const resolved_paramset_t* params) {
+                   const uint8_t* owf_input, const uint8_t* owf_output, const uint8_t* witness,
+                   const uint8_t* rho, size_t rholen, const resolved_paramset_t* params) {
   const unsigned int ell           = params->l;
   const unsigned int ell_bytes     = ell / 8;
   const unsigned int lambda        = params->lambda;
@@ -718,7 +732,6 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   const unsigned int ell_hat       = ell + lambda * 3 + UNIVERSAL_HASH_B_BITS;
   const unsigned int ell_hat_bytes = ell_hat / 8;
   const unsigned int w_grind       = params->w_grind;
-
 
   printf("resolved starting...\n");
 
@@ -797,7 +810,7 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
     uint8_t* chall_3 = rsd_signature_chall_3(sig, params);
     hash_challenge_3_final(chall_3, &chall_3_ctx, ctr, lambda);
     // declassify chall_3 which is put into the signature
-    faest_declassify(chall_3, lambda / 8);
+    // faest_declassify(chall_3, lambda / 8);
 
     // ::23
     if (!check_challenge_3(chall_3, lambda - w_grind, lambda)) {
@@ -815,6 +828,11 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
       break;
     }
   }
+  printf("prover chall3:\n");
+  for (int i = 0; i < lambda / 8; i++) {
+    printf("%x ", rsd_signature_chall_3(sig, params)[i]);
+  }
+  printf("\n");
   hash_clear(&chall_3_ctx);
   bavc_clear(&bavc);
 
@@ -823,10 +841,9 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   memcpy(rsd_signature_ctr(sig, params), &ctr, sizeof(ctr));
 }
 
-
-  // 重名函数
+// 重名函数
 int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const uint8_t* owf_input,
-               const uint8_t* owf_output, const resolved_paramset_t* params) {
+                    const uint8_t* owf_output, const resolved_paramset_t* params) {
   const unsigned int ell           = params->l;
   const unsigned int lambda        = params->lambda;
   const unsigned int lambda_bytes  = lambda / 8;
@@ -834,6 +851,7 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   const unsigned int ell_hat       = ell + lambda * 3 + UNIVERSAL_HASH_B_BITS;
   const unsigned int ell_hat_bytes = ell_hat / 8;
   const unsigned int utilde_bytes  = lambda_bytes + UNIVERSAL_HASH_B;
+
 
   // ::4-5
   if (!check_challenge_3(rsd_dsignature_chall_3(sig, params), lambda - params->w_grind, lambda)) {
@@ -861,8 +879,8 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   uint8_t hcom[MAX_LAMBDA_BYTES * 2];
 
   if (!resolved_vole_reconstruct(hcom, q, iv, rsd_dsignature_chall_3(sig, params),
-                        rsd_dsignature_decom_i(sig, params), rsd_dsignature_c(sig, 0, params),
-                        ell_hat, params)) {
+                                 rsd_dsignature_decom_i(sig, params),
+                                 rsd_dsignature_c(sig, 0, params), ell_hat, params)) {
     free_pointer_array(&q);
     return -1;
   }
@@ -898,8 +916,8 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   const uint8_t* d = rsd_dsignature_d(sig, params);
   uint8_t a0_tilde[MAX_LAMBDA_BYTES];
   rsd_verify(a0_tilde, d, q, chall_2, rsd_dsignature_chall_3(sig, params),
-             rsd_dsignature_a1_tilde(sig, params), rsd_dsignature_a2_tilde(sig, params), owf_input,
-             owf_output, params);
+             rsd_dsignature_a1_tilde(sig, params), rsd_dsignature_a2_tilde(sig, params),
+             owf_input, owf_output, params);
   free_pointer_array(&q);
 
   // Step: 20
@@ -907,6 +925,11 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   hash_challenge_3(chall_3, chall_2, a0_tilde, rsd_dsignature_a1_tilde(sig, params),
                    rsd_dsignature_a2_tilde(sig, params), rsd_dsignature_ctr(sig, params), lambda);
 
+  printf("verifier chall3:\n");
+  for (int i = 0; i < lambda_bytes; i++) {
+    printf("%x ", chall_3[i]);
+  }
+  printf("\n");
   // Step 21
   return memcmp(chall_3, rsd_dsignature_chall_3(sig, params), lambda_bytes) == 0 ? 0 : -1;
 }

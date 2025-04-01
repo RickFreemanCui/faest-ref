@@ -36,11 +36,18 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_keygen(uint8_t* pk, uint8_t* sk)
   if (!pk || !sk) {
     return -1;
   }
-  rand_bytes(SK_INPUT(sk), @OWF_INPUT_SIZE@);
+  // memset(sk, 0x13, @SK_SIZE@);
+  rand_bytes(sk, @SK_SIZE@);
   // declassify OWF input
   // faest_declassify(SK_INPUT(sk), @OWF_INPUT_SIZE@);
   resolved_@PARAM_L@_owf(SK_KEY(sk), SK_INPUT(sk), PK_OUTPUT(pk));
   memcpy(PK_INPUT(pk), SK_INPUT(sk), @OWF_INPUT_SIZE@);
+
+  // printf("keygen y:\n[");
+  // for (int i = 0; i < @M@ - @K@; i++) {
+  //   printf("%u, ", ptr_get_bit(PK_OUTPUT(pk), i));
+  // }
+  // printf("]\n");
 
   // declassify public key
   // faest_declassify(pk, @PK_SIZE@);
@@ -57,6 +64,11 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_unpack_private_key(resolved_@PAR
   // compute the witness
   uint8_t *e = (uint8_t *)malloc(@M@);
   generate_e(e, @M@, @W@, @BLOCK_SIZE@, sk, @LAMBDA@);
+  // printf("e:\n[");
+  // for (int i = 0; i < @M@; i++) {
+  //   printf("%u, ", e[i]);
+  // }
+  // printf("]\n");
   uint8_t *w = (uint8_t *)malloc(@ELL@);
   for (int sub_block_index = 0; sub_block_index < @W@; sub_block_index++) {
     int start_index = sub_block_index * @BLOCK_SIZE@;
@@ -66,27 +78,14 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_unpack_private_key(resolved_@PAR
     int b1 = -1;
     int b0 = -1;
 
-    if (e[start_index] == 1 || e[start_index + 1] == 1 || e[start_index + 2] == 1) {
-      a1 = 0;
-      a0 = 0;
-      b1 = e[start_index + 1];
-      b0 = e[start_index];
-    } else if (e[start_index + 3] == 1 || e[start_index + 4] == 1 || e[start_index + 5] == 1) {
-      a1 = 0;
-      a0 = 1;
-      b1 = e[start_index + 4];
-      b0 = e[start_index + 3];
-    } else if (e[start_index + 6] == 1 || e[start_index + 7] == 1 || e[start_index + 8] == 1) {
-      a1 = 1;
-      a0 = 0;
-      b1 = e[start_index + 7];
-      b0 = e[start_index + 6];
-    } else {
-      a1 = 1;
-      a0 = 1;
-      b1 = e[start_index + 9];
-      b0 = e[start_index + 8];
+    int valid_offset = 0;
+    while (e[start_index + valid_offset] != 1) {
+      valid_offset++;
     }
+    a1 = (valid_offset / 3) / 2;
+    a0 = (valid_offset / 3) % 2;
+    b1 = e[start_index + (a1 * 2 + a0) * 3 + 1];
+    b0 = e[start_index + (a1 * 2 + a0) * 3];
 
     w[sub_block_index * 4] = a0;
     w[sub_block_index * 4 + 1] = a1;
@@ -95,14 +94,15 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_unpack_private_key(resolved_@PAR
   }
 
   // pack the w vector
-  memset(unpacked_sk->witness, 0, sizeof(unpacked_sk->witness));
+  memset(unpacked_sk->witness, 0, sizeof (unpacked_sk->witness));
   for (int i = 0; i < @ELL@; i++) {
-    unpacked_sk->witness[i/8] ^= (w[i] << (i%8));
+    ptr_set_bit(unpacked_sk->witness, i, w[i]);
   }
   free(e);
   free(w);
 
   resolved_@PARAM_L@_owf(SK_KEY(sk), SK_INPUT(sk), unpacked_sk->owf_output);
+
   // declassify OWF output
   // faest_declassify(unpacked_sk->owf_output, sizeof(unpacked_sk->owf_output));
 
@@ -134,8 +134,15 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_sign_with_randomness(const uint8
     resolved_@PARAM_L@_clear_unpacked_private_key(&unpacked_sk);
     return ret;
   }
+  // printf("_unpacked_sign_with_randomness y:\n[");
+  // for (int i = 0; i < @M@ - @K@; i++) {
+  //   printf("%u, ", ptr_get_bit(unpacked_sk.owf_output, i));
+  // }
+  // printf("]\n");
 
   ret = resolved_@PARAM_L@_unpacked_sign_with_randomness(&unpacked_sk, message, message_len, rho, rho_len, signature, signature_len);
+  
+
   resolved_@PARAM_L@_clear_unpacked_private_key(&unpacked_sk);
   return ret;
 }
@@ -145,8 +152,8 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_sign(const uint8_t* sk, const ui
     return -1;
   }
 
-  uint8_t rho[RESOLVED_@PARAM@_LAMBDA / 8];
-  rand_bytes(rho, sizeof(rho));
+  uint8_t rho[RESOLVED_@PARAM@_LAMBDA / 8] = {0};
+  // rand_bytes(rho, sizeof(rho));
 
   return resolved_@PARAM_L@_sign_with_randomness(sk, message, message_len, rho, sizeof(rho), signature, signature_len);
 }
@@ -156,8 +163,8 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_unpacked_sign(const resolved_@PA
     return -1;
   }
 
-  uint8_t rho[RESOLVED_@PARAM@_LAMBDA / 8];
-  rand_bytes(rho, sizeof(rho));
+  uint8_t rho[RESOLVED_@PARAM@_LAMBDA / 8] = {0};
+  // rand_bytes(rho, sizeof(rho));
 
   return resolved_@PARAM_L@_unpacked_sign_with_randomness(sk, message, message_len, rho, sizeof(rho), signature, signature_len);
 }
@@ -180,6 +187,11 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_verify(const uint8_t* pk, const 
   }
 
   const resolved_paramset_t* params = resolved_get_paramset(RESOLVED_@PARAM@);
+  // printf("_verify y:\n[");
+  // for (int i = 0; i < @M@ - @K@; i++) {
+  //   printf("%u, ", ptr_get_bit(PK_OUTPUT(pk), i));
+  // }
+  // printf("]\n");
   return resolved_verify(message, message_len, signature, PK_INPUT(pk), PK_OUTPUT(pk), params);
 }
 

@@ -346,10 +346,22 @@ bool owf_rsd(const uint8_t* key, const uint8_t* input, uint8_t* output, int lamb
   for(int j=0;j<code_length;j++){
     y[i] ^= getH(i,j,code_length - code_dimension,code_length,buffer) & e[j];
   }
+  // printf("owf.c: y:\n[");
+  // for (int i = 0; i < code_length-code_dimension; i++) {
+  //   printf("%u, ", y[i]);
+  // }
+  // printf("]\n");
   //pack y into output
   for(int i=0;i<code_length - code_dimension;i++){
-    output[i/8] ^= (y[i] << (i%8));
+    ptr_set_bit(output, i, y[i]);
   }
+
+  // // check pack result:
+  // printf("owf.c: y->pack->unpack:\n[");
+  // for (int i = 0; i < code_length-code_dimension; i++) {
+  //   printf("%u, ", ptr_get_bit(output, i));
+  // }
+  // printf("]\n");
 
   free(e);
   free(y);

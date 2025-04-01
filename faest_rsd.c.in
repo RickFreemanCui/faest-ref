@@ -47,6 +47,10 @@
 #define zk_hash_SSS_3_init zk_hash_@SSS@_3_init
 #define zk_hash_SSS_3_update zk_hash_@SSS@_3_update
 
+
+#define MYDEBUG_START_ROW 0
+#define MYDEBUG_MAX_ROW 10
+
 // clang-format on
 
 /* pad sizes to multiples of some value; assumes that a is a power of 2 */
@@ -82,6 +86,18 @@ typedef struct bs12_constraint_poly {
   bs12_constraint_monomial_t monomial[12];
 } bs12_constraint_poly_t;
 
+
+void print_poly (bs12_constraint_poly_t* poly) {
+    printf("poly length: %u\n", poly->length);
+    for (uint32_t i = 0; i < poly->length; i++) {
+        printf("monomial %u: ", i);
+        for (uint32_t j = 0; j < poly->monomial[i].length; j++) {
+        printf("%u ", poly->monomial[i].coeff[j]);
+        }
+        printf("\n");
+    }
+}
+
 void rsd_compute_bs12_poly_index(const uint32_t witness_index, bs12_constraint_poly_t* poly,
                                  const resolved_paramset_t* params) {
   uint16_t m  = params->code_length;
@@ -89,12 +105,13 @@ void rsd_compute_bs12_poly_index(const uint32_t witness_index, bs12_constraint_p
   uint16_t bs = params->code_block_size;
   // this function only generate constraint poly for bs = 12
   assert(bs == 12);
+  assert(witness_index >= 0);
   assert(witness_index < m);
   // index
   int block_index      = witness_index / 12;
-  int block_offset     = block_index % 12;
-  int sub_block_index  = block_offset / 4;
-  int sub_block_offset = block_offset % 4;
+  int block_offset     = witness_index % 12;
+  int sub_block_index  = block_offset / 3;
+  int sub_block_offset = block_offset % 3;
   int a0               = block_index * 4;
   int a1               = a0 + 1;
   int b0               = a0 + 2;
@@ -218,8 +235,22 @@ static void rsd_SSS_constraints_prover(zk_hash_SSS_3_ctx* hasher, const uint8_t*
   uint16_t lambda = params->lambda;
 
   uint8_t* H = generate_H_mat(m - k, m, owf_in, lambda);
-  for (uint32_t row_index = 0; row_index < m - k; row_index++) {
+  printf("Prover Constraint starting...\n");
+
+
+//   printf("w:\n[");
+//   for (int j = 0; j < m/3; j++) {
+//     printf ("%u, ", ptr_get_bit(w, j));
+//   }
+//   printf("]\n");
+
+  for (uint32_t row_index = MYDEBUG_START_ROW; row_index < MYDEBUG_MAX_ROW; row_index++) {
     // printf("Processing row %u of %u...\n", row_index, m - k);
+    // printf("H[%u,:]:\n[", row_index);
+    // for (int j = 0; j < m; j++) {
+    //     printf ("%u, ", getH(row_index, j, m - k, m, H));
+    // }
+    // printf("]\n");
     bs12_constraint_poly_t poly;
     bfSSS_t tilde_a0 = bfSSS_zero();
     bfSSS_t tilde_a1 = bfSSS_zero();
@@ -230,17 +261,17 @@ static void rsd_SSS_constraints_prover(zk_hash_SSS_3_ctx* hasher, const uint8_t*
       }
       rsd_compute_bs12_poly_index(col_index, &poly, params);
       for (uint32_t monomial_index = 0; monomial_index < poly.length; monomial_index++) {
-        bs12_constraint_monomial_t* monomial = &poly.monomial[monomial_index];
-        if (monomial->length == 0) {
+        bs12_constraint_monomial_t monomial = poly.monomial[monomial_index];
+        if (monomial.length == 0) {
           // constant term
           // prover does not have to deal with this case
           continue;
-        } else if (monomial->length == 1) {
-          uint32_t a_index = monomial->coeff[0];
+        } else if (monomial.length == 1) {
+          uint32_t a_index = monomial.coeff[0];
           tilde_a2         = bfSSS_add(tilde_a2, w_tag[a_index]);
-        } else if (monomial->length == 2) {
-          uint32_t a_index = monomial->coeff[0];
-          uint32_t b_index = monomial->coeff[1];
+        } else if (monomial.length == 2) {
+          uint32_t a_index = monomial.coeff[0];
+          uint32_t b_index = monomial.coeff[1];
           uint8_t a_bit    = ptr_get_bit(w, a_index);
           uint8_t b_bit    = ptr_get_bit(w, b_index);
           bfSSS_t a_tag    = w_tag[a_index];
@@ -248,10 +279,10 @@ static void rsd_SSS_constraints_prover(zk_hash_SSS_3_ctx* hasher, const uint8_t*
           tilde_a2         = bfSSS_add(tilde_a2, bfSSS_mul_bit(a_tag, b_bit)); // M[a] * b
           tilde_a2         = bfSSS_add(tilde_a2, bfSSS_mul_bit(b_tag, a_bit)); // M[b] * a
           tilde_a1         = bfSSS_add(tilde_a1, bfSSS_mul(a_tag, b_tag));     // M[a] * M[b]
-        } else if (monomial->length == 3) {
-          uint32_t a_index = monomial->coeff[0];
-          uint32_t b_index = monomial->coeff[1];
-          uint32_t c_index = monomial->coeff[2];
+        } else if (monomial.length == 3) {
+          uint32_t a_index = monomial.coeff[0];
+          uint32_t b_index = monomial.coeff[1];
+          uint32_t c_index = monomial.coeff[2];
           uint8_t a_bit    = ptr_get_bit(w, a_index);
           uint8_t b_bit    = ptr_get_bit(w, b_index);
           uint8_t c_bit    = ptr_get_bit(w, c_index);
@@ -275,7 +306,6 @@ static void rsd_SSS_constraints_prover(zk_hash_SSS_3_ctx* hasher, const uint8_t*
 
     // Now we have tilde_a0, tilde_a1, tilde_a2 for this row
     zk_hash_SSS_3_update(hasher, tilde_a0, tilde_a1, tilde_a2);
-    break;
   }
 }
 
@@ -293,9 +323,12 @@ static void rsd_SSS_constraints_verifier(zk_hash_SSS_ctx* hasher, const bfSSS_t*
   bfSSS_t delta_sq   = bfSSS_mul(delta, delta);
   bfSSS_t delta_cube = bfSSS_mul(delta_sq, delta);
 
-  for (uint32_t row_index = 0; row_index < m - k; row_index++) {
+
+  printf("Verifier Constraint starting...\n");
+  for (uint32_t row_index = MYDEBUG_START_ROW; row_index < MYDEBUG_MAX_ROW; row_index++) {
     bs12_constraint_poly_t poly;
     bfSSS_t tilde_q = bfSSS_zero();
+    printf("y[%u] = %u\n", row_index, ptr_get_bit(owf_out, row_index));
     if (ptr_get_bit(owf_out, row_index) == 1) {
       tilde_q = bfSSS_add(tilde_q, delta_cube);
     }
@@ -306,38 +339,40 @@ static void rsd_SSS_constraints_verifier(zk_hash_SSS_ctx* hasher, const bfSSS_t*
       }
       rsd_compute_bs12_poly_index(col_index, &poly, params);
       for (uint32_t monomial_index = 0; monomial_index < poly.length; monomial_index++) {
-        bs12_constraint_monomial_t* monomial = &poly.monomial[monomial_index];
-        if (monomial->length == 0) {
+        bs12_constraint_monomial_t monomial = poly.monomial[monomial_index];
+        if (monomial.length == 0) {
           // constant term
           // add delta^3 to tilde_q
           tilde_q = bfSSS_add(tilde_q, delta_cube);
-        } else if (monomial->length == 1) {
+        } else if (monomial.length == 1) {
           // deg-1 monomial
           // tilde_q += K[a] * delta^2
-          uint32_t a_index = monomial->coeff[0];
+          uint32_t a_index = monomial.coeff[0];
           tilde_q          = bfSSS_add(tilde_q, bfSSS_mul(q_key[a_index], delta_sq));
-        } else if (monomial->length == 2) {
+        } else if (monomial.length == 2) {
           // deg-2 monomial
           // tilde_q += K[a] * K[b] * delta
-          uint32_t a_index = monomial->coeff[0];
-          uint32_t b_index = monomial->coeff[1];
+          uint32_t a_index = monomial.coeff[0];
+          uint32_t b_index = monomial.coeff[1];
           tilde_q = bfSSS_add(tilde_q, bfSSS_mul(bfSSS_mul(q_key[a_index], q_key[b_index]), delta));
-        } else if (monomial->length == 3) {
+        } else if (monomial.length == 3) {
           // deg-3 monomial
-          // tilde_q + K[a] * k[b] * K[c]
-          uint32_t a_index = monomial->coeff[0];
-          uint32_t b_index = monomial->coeff[1];
-          uint32_t c_index = monomial->coeff[2];
+          // tilde_q += K[a] * k[b] * K[c]
+          uint32_t a_index = monomial.coeff[0];
+          uint32_t b_index = monomial.coeff[1];
+          uint32_t c_index = monomial.coeff[2];
           tilde_q          = bfSSS_add(tilde_q,
                                        bfSSS_mul(bfSSS_mul(q_key[a_index], q_key[b_index]), q_key[c_index]));
+        } else {
+            printf("ERROR!!!");
         }
       }
     }
 
     // Now we have tilde_q for this row
     zk_hash_SSS_update(hasher, tilde_q);
-    break;
   }
+  free(H);
 }
 
 // OWF PROVER
@@ -370,6 +405,12 @@ void rsd_@SSS@_prover(uint8_t* a0_tilde, uint8_t* a1_tilde, uint8_t* a2_tilde, c
 
   zk_hash_SSS_3_finalize(a0_tilde, a1_tilde, a2_tilde, &hasher, bf_v_star_0,
                          bfSSS_add(bf_u_star_0, bf_v_star_1), bf_u_star_1);
+
+
+
+  bfSSS_t tmp = bfSSS_load(a0_tilde);
+  printf("ReSolveD Prover a0_tilde:\n");
+  print_bf320(tmp);
 
   faest_aligned_free(w_tag);
 }
@@ -420,4 +461,8 @@ void rsd_@SSS@_verifier(uint8_t* a0_tilde, const uint8_t* d, uint8_t** Q, const 
   bfSSS_t ret  = bfSSS_add(bfSSS_load(q_tilde), tmp3);
 
   bfSSS_store(a0_tilde, ret);
+
+  printf("ReSolveD Verifier a0_tilde:\n");
+  print_bf320(ret);
+
 }

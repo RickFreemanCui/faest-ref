@@ -49,7 +49,23 @@ BOOST_AUTO_TEST_CASE(test_sign) {
 
   std::vector<uint8_t> msg;
   msg.resize(1024);
-  rand_bytes(msg.data(), msg.size());
+  for (int i = 0; i < msg.size(); i++) {
+    msg[i] = 0;
+  }
+   rand_bytes(msg.data(), msg.size());
+
+
+   printf("pk: ");
+   for (auto i = 0; i < public_key_size; i++) {
+    printf("%x ", pk[i]);
+   }
+   printf("\n");
+
+   printf("sk: ");
+   for (auto i = 0; i < private_key_size; i++) {
+    printf("%x ", sk[i]);
+   }
+   printf("\n");
 
   // clang-format off
   BOOST_TEST_MESSAGE("RESOLVED SIGN START");

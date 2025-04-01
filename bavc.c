@@ -450,9 +450,7 @@ void bavc_clear(bavc_t* com) {
   free(com->k);
 }
 
-
 // BAVC.Commit for RSD
-
 
 static void rsd_expand_seeds(uint8_t* nodes, const uint8_t* iv, const resolved_paramset_t* params) {
   const unsigned int lambda_bytes = params->lambda / 8;
@@ -464,8 +462,8 @@ static void rsd_expand_seeds(uint8_t* nodes, const uint8_t* iv, const resolved_p
   }
 }
 
-  static uint8_t* rsd_generate_seeds(const uint8_t* root_seed, const uint8_t* iv,
-    const resolved_paramset_t* params) {
+static uint8_t* rsd_generate_seeds(const uint8_t* root_seed, const uint8_t* iv,
+                                   const resolved_paramset_t* params) {
   unsigned int lambda_bytes = params->lambda / 8;
   uint8_t* nodes            = calloc(2 * params->L - 1, lambda_bytes);
   assert(nodes);
@@ -474,11 +472,10 @@ static void rsd_expand_seeds(uint8_t* nodes, const uint8_t* iv, const resolved_p
   rsd_expand_seeds(nodes, iv, params);
 
   return nodes;
-  }
-
+}
 
 ATTR_PURE static inline unsigned int rsd_pos_in_tree(unsigned int i, unsigned int j,
-                                                 const resolved_paramset_t* params) {
+                                                     const resolved_paramset_t* params) {
   const unsigned int tmp = 1 << (params->k - 1);
   if (j < tmp) {
     return params->L - 1 + params->tau * j + i;
@@ -489,224 +486,217 @@ ATTR_PURE static inline unsigned int rsd_pos_in_tree(unsigned int i, unsigned in
 }
 
 void resolved_bavc_commit(bavc_t* bavc, const uint8_t* rootKey, const uint8_t* iv,
-  const resolved_paramset_t* params) {
-const unsigned int lambda       = params->lambda;
-const unsigned int L            = params->L;
-const unsigned int lambda_bytes = lambda / 8;
-const unsigned int com_size     = lambda_bytes * 2; // size of com_ij
+                          const resolved_paramset_t* params) {
+  const unsigned int lambda       = params->lambda;
+  const unsigned int L            = params->L;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int com_size     = lambda_bytes * 2; // size of com_ij
 
-H1_context_t h1_com_ctx;
-H1_init(&h1_com_ctx, lambda);
+  H1_context_t h1_com_ctx;
+  H1_init(&h1_com_ctx, lambda);
 
-// Generating the tree
-uint8_t* nodes = rsd_generate_seeds(rootKey, iv, params);
+  // Generating the tree
+  uint8_t* nodes = rsd_generate_seeds(rootKey, iv, params);
 
-// Initialzing stuff
-bavc->h   = malloc(lambda_bytes * 2);
-bavc->com = malloc(L * com_size);
-bavc->sd  = malloc(L * lambda_bytes);
-assert(bavc->h && bavc->com && bavc->sd);
+  // Initialzing stuff
+  bavc->h   = malloc(lambda_bytes * 2);
+  bavc->com = malloc(L * com_size);
+  bavc->sd  = malloc(L * lambda_bytes);
+  assert(bavc->h && bavc->com && bavc->sd);
 
-// Step: 1..3
-bavc->k = NODE(nodes, 0, lambda_bytes);
+  // Step: 1..3
+  bavc->k = NODE(nodes, 0, lambda_bytes);
 
-assert(bavc->h);
-assert(bavc->com);
-assert(bavc->sd);
-assert(bavc->k);
+  assert(bavc->h);
+  assert(bavc->com);
+  assert(bavc->sd);
+  assert(bavc->k);
 
-// Step: 4..5
-// compute commitments for remaining instances
-for (unsigned int i = 0, offset = 0; i < params->tau; ++i) {
-H1_context_t h1_ctx;
-H1_init(&h1_ctx, lambda);
+  // Step: 4..5
+  // compute commitments for remaining instances
+  for (unsigned int i = 0, offset = 0; i < params->tau; ++i) {
+    H1_context_t h1_ctx;
+    H1_init(&h1_ctx, lambda);
 
-const unsigned int N_i = bavc_max_node_index(i, params->tau1, params->k);
-for (unsigned int j = 0; j < N_i; ++j, ++offset) {
-const unsigned int alpha = rsd_pos_in_tree(i, j, params);
-faest_em_leaf_commit(bavc->sd + offset * lambda_bytes, bavc->com + offset * com_size,
-NODE(nodes, alpha, lambda_bytes), iv, i + L - 1, lambda);
-H1_update(&h1_ctx, bavc->com + offset * com_size, com_size);
+    const unsigned int N_i = bavc_max_node_index(i, params->tau1, params->k);
+    for (unsigned int j = 0; j < N_i; ++j, ++offset) {
+      const unsigned int alpha = rsd_pos_in_tree(i, j, params);
+      faest_em_leaf_commit(bavc->sd + offset * lambda_bytes, bavc->com + offset * com_size,
+                           NODE(nodes, alpha, lambda_bytes), iv, i + L - 1, lambda);
+      H1_update(&h1_ctx, bavc->com + offset * com_size, com_size);
+    }
+
+    uint8_t hi[MAX_LAMBDA_BYTES * 2];
+    // Step 11
+    H1_final(&h1_ctx, hi, lambda_bytes * 2);
+    // Step 12
+    H1_update(&h1_com_ctx, hi, lambda_bytes * 2);
+  }
+
+  // Step 12
+  H1_final(&h1_com_ctx, bavc->h, lambda_bytes * 2);
 }
-
-uint8_t hi[MAX_LAMBDA_BYTES * 2];
-// Step 11
-H1_final(&h1_ctx, hi, lambda_bytes * 2);
-// Step 12
-H1_update(&h1_com_ctx, hi, lambda_bytes * 2);
-}
-
-// Step 12
-H1_final(&h1_com_ctx, bavc->h, lambda_bytes * 2);
-}
-
-
-
 
 bool resolved_bavc_open(uint8_t* decom_i, const bavc_t* vc, const uint16_t* i_delta,
-  const resolved_paramset_t* params) {
-const unsigned int lambda       = params->lambda;
-const unsigned int L            = params->L;
-const unsigned int lambda_bytes = lambda / 8;
-const unsigned int k            = params->k;
-const unsigned int tau          = params->tau;
-const unsigned int tau_1        = params->tau1;
-const unsigned int com_size     = 2 * lambda_bytes;
+                        const resolved_paramset_t* params) {
+  const unsigned int lambda       = params->lambda;
+  const unsigned int L            = params->L;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int k            = params->k;
+  const unsigned int tau          = params->tau;
+  const unsigned int tau_1        = params->tau1;
+  const unsigned int com_size     = 2 * lambda_bytes;
 
-uint8_t* decom_i_end = decom_i + com_size * tau + params->T_open * lambda_bytes;
+  uint8_t* decom_i_end = decom_i + com_size * tau + params->T_open * lambda_bytes;
 
-// Step 5
-uint8_t* s = calloc((2 * L - 1 + 7) / 8, 1);
-assert(s);
-// Step 6
-unsigned int nh = 0;
+  // Step 5
+  uint8_t* s = calloc((2 * L - 1 + 7) / 8, 1);
+  assert(s);
+  // Step 6
+  unsigned int nh = 0;
 
-// Step 7..15
-for (unsigned int i = 0; i < tau; ++i) {
-unsigned int alpha = rsd_pos_in_tree(i, i_delta[i], params);
-ptr_set_bit(s, alpha, 1);
-++nh;
+  // Step 7..15
+  for (unsigned int i = 0; i < tau; ++i) {
+    unsigned int alpha = rsd_pos_in_tree(i, i_delta[i], params);
+    ptr_set_bit(s, alpha, 1);
+    ++nh;
 
-while (alpha > 0 && ptr_get_bit(s, (alpha - 1) / 2) == 0) {
-alpha = (alpha - 1) / 2;
-ptr_set_bit(s, alpha, 1);
-++nh;
+    while (alpha > 0 && ptr_get_bit(s, (alpha - 1) / 2) == 0) {
+      alpha = (alpha - 1) / 2;
+      ptr_set_bit(s, alpha, 1);
+      ++nh;
+    }
+  }
+
+  // Step 16..17
+  if (nh - 2 * tau + 1 > params->T_open) {
+    free(s);
+    return false;
+  }
+
+  // Step 3
+  const uint8_t* com = vc->com;
+  for (unsigned int i = 0; i < tau; ++i, decom_i += com_size) {
+    memcpy(decom_i, com + i_delta[i] * com_size, com_size);
+    com += bavc_max_node_index(i, tau_1, k) * com_size;
+  }
+
+  // Step 19..25
+  for (int i = L - 2; i >= 0; --i) {
+    ptr_set_bit(s, i, ptr_get_bit(s, 2 * i + 1) | ptr_get_bit(s, 2 * i + 2));
+    if ((ptr_get_bit(s, 2 * i + 1) ^ ptr_get_bit(s, 2 * i + 2)) == 1) {
+      const unsigned int alpha = 2 * i + 1 + ptr_get_bit(s, 2 * i + 1);
+      memcpy(decom_i, NODE(vc->k, alpha, lambda_bytes), lambda_bytes);
+      decom_i += lambda_bytes;
+    }
+  }
+
+  memset(decom_i, 0, decom_i_end - decom_i);
+
+  free(s);
+  return true;
 }
-}
-
-// Step 16..17
-if (nh - 2 * tau + 1 > params->T_open) {
-free(s);
-return false;
-}
-
-// Step 3
-const uint8_t* com = vc->com;
-for (unsigned int i = 0; i < tau; ++i, decom_i += com_size) {
-memcpy(decom_i, com + i_delta[i] * com_size, com_size);
-com += bavc_max_node_index(i, tau_1, k) * com_size;
-}
-
-// Step 19..25
-for (int i = L - 2; i >= 0; --i) {
-ptr_set_bit(s, i, ptr_get_bit(s, 2 * i + 1) | ptr_get_bit(s, 2 * i + 2));
-if ((ptr_get_bit(s, 2 * i + 1) ^ ptr_get_bit(s, 2 * i + 2)) == 1) {
-const unsigned int alpha = 2 * i + 1 + ptr_get_bit(s, 2 * i + 1);
-memcpy(decom_i, NODE(vc->k, alpha, lambda_bytes), lambda_bytes);
-decom_i += lambda_bytes;
-}
-}
-
-memset(decom_i, 0, decom_i_end - decom_i);
-
-free(s);
-return true;
-}
-
 
 static bool rsd_reconstruct_keys(uint8_t* s, uint8_t* keys, const uint8_t* decom_i,
-  const uint16_t* i_delta, const uint8_t* iv,
-  const resolved_paramset_t* params) {
-const unsigned int lambda       = params->lambda;
-const unsigned int L            = params->L;
-const unsigned int lambda_bytes = lambda / 8;
-const unsigned int tau          = params->tau;
+                                 const uint16_t* i_delta, const uint8_t* iv,
+                                 const resolved_paramset_t* params) {
+  const unsigned int lambda       = params->lambda;
+  const unsigned int L            = params->L;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int tau          = params->tau;
 
-const uint8_t* nodes = decom_i + 2 * tau * lambda_bytes;
-const uint8_t* end   = nodes + params->T_open * lambda_bytes;
+  const uint8_t* nodes = decom_i + 2 * tau * lambda_bytes;
+  const uint8_t* end   = nodes + params->T_open * lambda_bytes;
 
-// Step 7..10
-for (unsigned int i = 0; i < tau; ++i) {
-unsigned int alpha = rsd_pos_in_tree(i, i_delta[i], params);
-ptr_set_bit(s, alpha, 1);
+  // Step 7..10
+  for (unsigned int i = 0; i < tau; ++i) {
+    unsigned int alpha = rsd_pos_in_tree(i, i_delta[i], params);
+    ptr_set_bit(s, alpha, 1);
+  }
+
+  // Step 12.12
+  for (int i = L - 2; i >= 0; --i) {
+    ptr_set_bit(s, i, ptr_get_bit(s, 2 * i + 1) | ptr_get_bit(s, 2 * i + 2));
+    if ((ptr_get_bit(s, 2 * i + 1) ^ ptr_get_bit(s, 2 * i + 2)) == 1) {
+      if (nodes == end) {
+        return false;
+      }
+
+      const unsigned int alpha = 2 * i + 1 + ptr_get_bit(s, 2 * i + 1);
+      memcpy(keys + alpha * lambda_bytes, nodes, lambda_bytes);
+      nodes += lambda_bytes;
+    }
+  }
+
+  for (; nodes != end; ++nodes) {
+    if (*nodes) {
+      return false;
+    }
+  }
+
+  for (unsigned int i = 0; i != L - 1; ++i) {
+    if (!ptr_get_bit(s, i)) {
+      prg_2_lambda(keys + i * lambda_bytes, iv, i, keys + (2 * i + 1) * lambda_bytes, lambda);
+    }
+  }
+
+  return true;
 }
-
-// Step 12.12
-for (int i = L - 2; i >= 0; --i) {
-ptr_set_bit(s, i, ptr_get_bit(s, 2 * i + 1) | ptr_get_bit(s, 2 * i + 2));
-if ((ptr_get_bit(s, 2 * i + 1) ^ ptr_get_bit(s, 2 * i + 2)) == 1) {
-if (nodes == end) {
-return false;
-}
-
-const unsigned int alpha = 2 * i + 1 + ptr_get_bit(s, 2 * i + 1);
-memcpy(keys + alpha * lambda_bytes, nodes, lambda_bytes);
-nodes += lambda_bytes;
-}
-}
-
-for (; nodes != end; ++nodes) {
-if (*nodes) {
-return false;
-}
-}
-
-for (unsigned int i = 0; i != L - 1; ++i) {
-if (!ptr_get_bit(s, i)) {
-prg_2_lambda(keys + i * lambda_bytes, iv, i, keys + (2 * i + 1) * lambda_bytes, lambda);
-}
-}
-
-return true;
-}
-
-
-
 
 bool resolved_bavc_reconstruct(bavc_rec_t* bavc_rec, const uint8_t* decom_i,
-  const uint16_t* i_delta, const uint8_t* iv,
-  const resolved_paramset_t* params) {
-// Initializing
-const unsigned int lambda       = params->lambda;
-const unsigned int L            = params->L;
-const unsigned int lambda_bytes = lambda / 8;
-const unsigned int k            = params->k;
-const unsigned int tau          = params->tau;
-const unsigned int tau_1        = params->tau1;
-const unsigned int com_size     = lambda_bytes * 2; // size of com_ij
+                               const uint16_t* i_delta, const uint8_t* iv,
+                               const resolved_paramset_t* params) {
+  // Initializing
+  const unsigned int lambda       = params->lambda;
+  const unsigned int L            = params->L;
+  const unsigned int lambda_bytes = lambda / 8;
+  const unsigned int k            = params->k;
+  const unsigned int tau          = params->tau;
+  const unsigned int tau_1        = params->tau1;
+  const unsigned int com_size     = lambda_bytes * 2; // size of com_ij
 
-// Step 6
-uint8_t* s = calloc((2 * L - 1 + 7) / 8, 1);
-assert(s);
-uint8_t* keys = calloc(2 * params->L - 1, lambda_bytes);
-assert(keys);
+  // Step 6
+  uint8_t* s = calloc((2 * L - 1 + 7) / 8, 1);
+  assert(s);
+  uint8_t* keys = calloc(2 * params->L - 1, lambda_bytes);
+  assert(keys);
 
-// Step 7..10
-if (!rsd_reconstruct_keys(s, keys, decom_i, i_delta, iv, params)) {
-free(keys);
-free(s);
-return false;
-}
+  // Step 7..10
+  if (!rsd_reconstruct_keys(s, keys, decom_i, i_delta, iv, params)) {
+    free(keys);
+    free(s);
+    return false;
+  }
 
-H1_context_t h1_com_ctx;
-H1_init(&h1_com_ctx, lambda);
+  H1_context_t h1_com_ctx;
+  H1_init(&h1_com_ctx, lambda);
 
-for (unsigned int i = 0, offset = 0; i != tau; ++i) {
-H1_context_t h1_ctx;
-H1_init(&h1_ctx, lambda);
+  for (unsigned int i = 0, offset = 0; i != tau; ++i) {
+    H1_context_t h1_ctx;
+    H1_init(&h1_ctx, lambda);
 
-const unsigned int N_i = bavc_max_node_index(i, tau_1, k);
-for (unsigned int j = 0; j != N_i; ++j) {
-const unsigned int alpha = rsd_pos_in_tree(i, j, params);
-if (ptr_get_bit(s, alpha)) {
-H1_update(&h1_ctx, decom_i + i * com_size, com_size);
-} else {
-uint8_t com[2 * MAX_LAMBDA_BYTES];
-faest_em_leaf_commit(bavc_rec->s + offset * lambda_bytes, com, keys + alpha * lambda_bytes,
-iv, i + L - 1, lambda);
-++offset;
-H1_update(&h1_ctx, com, com_size);
-}
-}
+    const unsigned int N_i = bavc_max_node_index(i, tau_1, k);
+    for (unsigned int j = 0; j != N_i; ++j) {
+      const unsigned int alpha = rsd_pos_in_tree(i, j, params);
+      if (ptr_get_bit(s, alpha)) {
+        H1_update(&h1_ctx, decom_i + i * com_size, com_size);
+      } else {
+        uint8_t com[2 * MAX_LAMBDA_BYTES];
+        faest_em_leaf_commit(bavc_rec->s + offset * lambda_bytes, com, keys + alpha * lambda_bytes,
+                             iv, i + L - 1, lambda);
+        ++offset;
+        H1_update(&h1_ctx, com, com_size);
+      }
+    }
 
-uint8_t hi[MAX_LAMBDA_BYTES * 2];
-H1_final(&h1_ctx, hi, lambda_bytes * 2);
-H1_update(&h1_com_ctx, hi, lambda_bytes * 2);
-}
+    uint8_t hi[MAX_LAMBDA_BYTES * 2];
+    H1_final(&h1_ctx, hi, lambda_bytes * 2);
+    H1_update(&h1_com_ctx, hi, lambda_bytes * 2);
+  }
 
-H1_final(&h1_com_ctx, bavc_rec->h, lambda_bytes * 2);
+  H1_final(&h1_com_ctx, bavc_rec->h, lambda_bytes * 2);
 
-free(keys);
-free(s);
-return true;
+  free(keys);
+  free(s);
+  return true;
 }
