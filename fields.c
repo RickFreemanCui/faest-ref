@@ -1202,8 +1202,13 @@ bf320_t bf320_mul_64(bf320_t lhs, bf64_t rhs) {
 }
 
 
-bf320_t bf320_mul_bit(bf320_t lhs, uint8_t rhs) {
-  return bf320_and_64(lhs, -((uint64_t)rhs & 1));
+inline bf320_t bf320_mul_bit(bf320_t lhs, uint8_t rhs) {
+  assert(rhs == 0 || rhs == 1);
+  if (rhs == 1) {
+    return lhs;
+  } else {
+    return bf320_zero();
+  }
 }
 
 

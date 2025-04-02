@@ -36,19 +36,11 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_keygen(uint8_t* pk, uint8_t* sk)
   if (!pk || !sk) {
     return -1;
   }
-  // memset(sk, 0x13, @SK_SIZE@);
   rand_bytes(sk, @SK_SIZE@);
   // declassify OWF input
   // faest_declassify(SK_INPUT(sk), @OWF_INPUT_SIZE@);
   resolved_@PARAM_L@_owf(SK_KEY(sk), SK_INPUT(sk), PK_OUTPUT(pk));
   memcpy(PK_INPUT(pk), SK_INPUT(sk), @OWF_INPUT_SIZE@);
-
-  // printf("keygen y:\n[");
-  // for (int i = 0; i < @M@ - @K@; i++) {
-  //   printf("%u, ", ptr_get_bit(PK_OUTPUT(pk), i));
-  // }
-  // printf("]\n");
-
   // declassify public key
   // faest_declassify(pk, @PK_SIZE@);
   return 0;
@@ -63,12 +55,7 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_unpack_private_key(resolved_@PAR
   memcpy(unpacked_sk->owf_key, SK_KEY(sk), sizeof(unpacked_sk->owf_key));
   // compute the witness
   uint8_t *e = (uint8_t *)malloc(@M@);
-  generate_e(e, @M@, @W@, @BLOCK_SIZE@, sk, @LAMBDA@);
-  // printf("e:\n[");
-  // for (int i = 0; i < @M@; i++) {
-  //   printf("%u, ", e[i]);
-  // }
-  // printf("]\n");
+  generate_e(e, @M@, @W@, @BLOCK_SIZE@, SK_KEY(sk), @LAMBDA@);
   uint8_t *w = (uint8_t *)malloc(@ELL@);
   for (int sub_block_index = 0; sub_block_index < @W@; sub_block_index++) {
     int start_index = sub_block_index * @BLOCK_SIZE@;
@@ -134,11 +121,7 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_sign_with_randomness(const uint8
     resolved_@PARAM_L@_clear_unpacked_private_key(&unpacked_sk);
     return ret;
   }
-  // printf("_unpacked_sign_with_randomness y:\n[");
-  // for (int i = 0; i < @M@ - @K@; i++) {
-  //   printf("%u, ", ptr_get_bit(unpacked_sk.owf_output, i));
-  // }
-  // printf("]\n");
+
 
   ret = resolved_@PARAM_L@_unpacked_sign_with_randomness(&unpacked_sk, message, message_len, rho, rho_len, signature, signature_len);
   
@@ -187,11 +170,7 @@ int FAEST_CALLING_CONVENTION resolved_@PARAM_L@_verify(const uint8_t* pk, const 
   }
 
   const resolved_paramset_t* params = resolved_get_paramset(RESOLVED_@PARAM@);
-  // printf("_verify y:\n[");
-  // for (int i = 0; i < @M@ - @K@; i++) {
-  //   printf("%u, ", ptr_get_bit(PK_OUTPUT(pk), i));
-  // }
-  // printf("]\n");
+
   return resolved_verify(message, message_len, signature, PK_INPUT(pk), PK_OUTPUT(pk), params);
 }
 

@@ -431,12 +431,6 @@ void faest_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8_t*
     }
   }
 
-  printf("prover chall3:\n");
-  for (int i = 0; i < params->lambda / 8; i++) {
-    printf("%x ", signature_chall_3(sig, params)[i]);
-  }
-  printf("\n");
-
   hash_clear(&chall_3_ctx);
   bavc_clear(&bavc);
 
@@ -527,11 +521,6 @@ int faest_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const ui
   hash_challenge_3(chall_3, chall_2, a0_tilde, dsignature_a1_tilde(sig, params),
                    dsignature_a2_tilde(sig, params), dsignature_ctr(sig, params), lambda);
 
-  printf("verifier chall3:\n");
-  for (int i = 0; i < params->lambda / 8; i++) {
-    printf("%x ", chall_3[i]);
-  }
-  printf("\n");
 
   // Step 21
   return memcmp(chall_3, dsignature_chall_3(sig, params), lambda_bytes) == 0 ? 0 : -1;
@@ -733,7 +722,6 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   const unsigned int ell_hat_bytes = ell_hat / 8;
   const unsigned int w_grind       = params->w_grind;
 
-  printf("resolved starting...\n");
 
   // ::3
   uint8_t mu[MAX_LAMBDA_BYTES * 2];
@@ -762,6 +750,7 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   uint8_t chall_1[(5 * MAX_LAMBDA_BYTES) + 8];
   hash_challenge_1(chall_1, mu, bavc.h, rsd_signature_c(sig, 0, params), iv, lambda, ell, tau);
 
+
   // ::9-10
   vole_hash(rsd_signature_u_tilde(sig, params), chall_1, u, ell, lambda);
 
@@ -789,10 +778,10 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   uint8_t chall_2[3 * MAX_LAMBDA_BYTES + 8];
   hash_challenge_2_finalize(chall_2, &chall_2_ctx, rsd_signature_d(sig, params), lambda, ell);
 
+
   // ::16-20
   uint8_t a0_tilde[MAX_LAMBDA_BYTES];
 
-  printf("rsd_prove starting...\n");
   rsd_prove(a0_tilde, rsd_signature_a1_tilde(sig, params), rsd_signature_a2_tilde(sig, params),
             witness, u + ell_bytes, V, owf_input, owf_output, chall_2, params);
 
@@ -828,11 +817,6 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
       break;
     }
   }
-  printf("prover chall3:\n");
-  for (int i = 0; i < lambda / 8; i++) {
-    printf("%x ", rsd_signature_chall_3(sig, params)[i]);
-  }
-  printf("\n");
   hash_clear(&chall_3_ctx);
   bavc_clear(&bavc);
 
@@ -912,6 +896,8 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   uint8_t chall_2[3 * MAX_LAMBDA_BYTES + 8];
   hash_challenge_2_finalize(chall_2, &chall_2_ctx, rsd_dsignature_d(sig, params), lambda, ell);
 
+
+
   // Step 18
   const uint8_t* d = rsd_dsignature_d(sig, params);
   uint8_t a0_tilde[MAX_LAMBDA_BYTES];
@@ -920,16 +906,12 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
              owf_input, owf_output, params);
   free_pointer_array(&q);
 
+
   // Step: 20
   uint8_t chall_3[MAX_LAMBDA_BYTES];
   hash_challenge_3(chall_3, chall_2, a0_tilde, rsd_dsignature_a1_tilde(sig, params),
                    rsd_dsignature_a2_tilde(sig, params), rsd_dsignature_ctr(sig, params), lambda);
 
-  printf("verifier chall3:\n");
-  for (int i = 0; i < lambda_bytes; i++) {
-    printf("%x ", chall_3[i]);
-  }
-  printf("\n");
   // Step 21
   return memcmp(chall_3, rsd_dsignature_chall_3(sig, params), lambda_bytes) == 0 ? 0 : -1;
 }
