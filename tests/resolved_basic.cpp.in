@@ -48,7 +48,8 @@ BOOST_AUTO_TEST_CASE(test_sign) {
   sig.resize(signature_size);
 
   std::vector<uint8_t> msg;
-   rand_bytes(msg.data(), msg.size());
+  msg.resize(1024);
+  rand_bytes(msg.data(), msg.size());
 
 
   // clang-format off
