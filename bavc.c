@@ -643,7 +643,7 @@ static bool rsd_reconstruct_keys(uint8_t* s, uint8_t* keys, const uint8_t* decom
   return true;
 }
 
-bool resolved_bavc_reconstruct(bavc_rec_t* bavc_rec, const uint8_t* decom_i,
+static bool resolved_bavc_reconstruct_internal(bavc_rec_t* bavc_rec, const uint8_t* decom_i,
                                const uint16_t* i_delta, const uint8_t* iv,
                                const resolved_paramset_t* params) {
   // Initializing
@@ -699,4 +699,13 @@ bool resolved_bavc_reconstruct(bavc_rec_t* bavc_rec, const uint8_t* decom_i,
   free(keys);
   free(s);
   return true;
+}
+
+
+
+
+bool resolved_bavc_reconstruct(bavc_rec_t* bavc_rec, const uint8_t* decom_i,
+  const uint16_t* i_delta, const uint8_t* iv,
+  const resolved_paramset_t* params) {
+    return  resolved_bavc_reconstruct_internal(bavc_rec, decom_i, i_delta, iv, params);
 }
