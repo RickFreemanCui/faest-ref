@@ -750,6 +750,11 @@ void resolved_sign(uint8_t* sig, const uint8_t* msg, size_t msg_len, const uint8
   uint8_t chall_1[(5 * MAX_LAMBDA_BYTES) + 8];
   hash_challenge_1(chall_1, mu, bavc.h, rsd_signature_c(sig, 0, params), iv, lambda, ell, tau);
 
+  printf("prover chall_1: \n");
+  for (int i = 0; i < 5 * MAX_LAMBDA_BYTES + 8; ++i) {
+    printf("%x ", chall_1[i]);
+  }
+  printf("\n");
 
   // ::9-10
   vole_hash(rsd_signature_u_tilde(sig, params), chall_1, u, ell, lambda);
@@ -872,6 +877,12 @@ int resolved_verify(const uint8_t* msg, size_t msglen, const uint8_t* sig, const
   // ::10
   uint8_t chall_1[5 * MAX_LAMBDA_BYTES + 8];
   hash_challenge_1(chall_1, mu, hcom, rsd_dsignature_c(sig, 0, params), iv, lambda, ell, tau);
+
+  printf("verifier chall_1: \n");
+  for (int i = 0; i < 5 * MAX_LAMBDA_BYTES + 8; ++i) {
+    printf("%x ", chall_1[i]);
+  }
+  printf("\n");
 
   // Step 12, 14 and 15
   H2_context_t chall_2_ctx;
