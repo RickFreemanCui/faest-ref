@@ -227,4 +227,50 @@ BOOST_DATA_TEST_CASE(test_keys, all_parameters, param_id) {
   }
 }
 
+
+BOOST_DATA_TEST_CASE(resolved_test_keys, rsd_all_parameters, param_id) {
+  std::random_device rd;
+
+  BOOST_TEST_CONTEXT("Parameter set: " << resolved_get_param_name(param_id)) {
+    const auto params       = *resolved_get_paramset(param_id);
+    const auto lambda       = params.lambda;
+    const auto lambda_bytes = lambda / 8;
+
+    bavc_t vc;
+    resolved_bavc_commit(&vc, root_key.data(), iv.data(), &params);
+
+    std::vector<uint8_t> decom_i;
+    std::vector<uint16_t> i_delta;
+    i_delta.resize(params.tau);
+
+    bool ret = false;
+    while (!ret) {
+      for (unsigned int i = 0; i != params.tau; ++i) {
+        std::uniform_int_distribution<> distribution{
+            0, static_cast<int>(bavc_max_node_index(i, params.tau1, params.k)) - 1};
+        i_delta[i] = distribution(rd);
+      }
+
+      decom_i.clear();
+      decom_i.resize((2 * params.tau + params.T_open )* lambda_bytes);
+
+      ret = resolved_bavc_open(decom_i.data(), &vc, i_delta.data(), &params);
+    }
+    std::cout << ret << std::endl;
+    BOOST_TEST(ret);
+
+    std::vector<uint8_t> rec_h, rec_s;
+    rec_h.resize(2 * lambda_bytes);
+    rec_s.resize((params.L - params.tau) * lambda_bytes);
+
+    bavc_rec_t vc_rec;
+    vc_rec.h = rec_h.data();
+    vc_rec.s = rec_s.data();
+
+    BOOST_TEST(resolved_bavc_reconstruct(&vc_rec, decom_i.data(), i_delta.data(), iv.data(), &params));
+    BOOST_TEST(memcmp(vc.h, vc_rec.h, 2 * lambda_bytes) == 0);
+
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -110,7 +110,7 @@ typedef struct resolved_paramset_t {
   uint16_t owf_output_size;
 } resolved_paramset_t;
 
-const char* ATTR_CONST rsd_get_param_name(resolved_paramid_t paramid);
+const char* ATTR_CONST resolved_get_param_name(resolved_paramid_t paramid);
 const resolved_paramset_t* ATTR_CONST resolved_get_paramset(resolved_paramid_t paramid);
 
 

@@ -107,12 +107,12 @@ if boost_test.found()
   #   args: ['-t', 'utils'],
   #   timeout: 6000,
   # )
-  # test(
-  #   'BAVC',
-  #   extended_tests,
-  #   args: ['-t', 'bavc'],
-  #   timeout: 6000,
-  # )
+  test(
+    'BAVC',
+    extended_tests,
+    args: ['-t', 'bavc'],
+    timeout: 6000,
+  )
   # test(
   #   'VOLE',
   #   extended_tests,

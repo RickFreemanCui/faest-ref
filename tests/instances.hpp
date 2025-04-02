@@ -19,4 +19,8 @@ constexpr faest_paramid_t all_parameters[] = {
     FAEST_EM_128S, FAEST_EM_128F, FAEST_EM_192S, FAEST_EM_192F, FAEST_EM_256S, FAEST_EM_256F,
 };
 
+constexpr resolved_paramid_t rsd_all_parameters[] = {
+    RESOLVED_320F,
+};
+
 #endif
