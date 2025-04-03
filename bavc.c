@@ -519,6 +519,7 @@ void resolved_bavc_commit(bavc_t* bavc, const uint8_t* rootKey, const uint8_t* i
     H1_init(&h1_ctx, lambda);
 
     const unsigned int N_i = bavc_max_node_index(i, params->tau1, params->k);
+    
     for (unsigned int j = 0; j < N_i; ++j, ++offset) {
       const unsigned int alpha = rsd_pos_in_tree(i, j, params);
       faest_em_leaf_commit(bavc->sd + offset * lambda_bytes, bavc->com + offset * com_size,
@@ -676,6 +677,8 @@ static bool resolved_bavc_reconstruct_internal(bavc_rec_t* bavc_rec, const uint8
     H1_init(&h1_ctx, lambda);
 
     const unsigned int N_i = bavc_max_node_index(i, tau_1, k);
+
+
     for (unsigned int j = 0; j != N_i; ++j) {
       const unsigned int alpha = rsd_pos_in_tree(i, j, params);
       if (ptr_get_bit(s, alpha)) {

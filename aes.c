@@ -12,6 +12,7 @@
 #include "fields.h"
 #include "compat.h"
 #include "utils.h"
+#include "stdio.h"
 
 #if defined(HAVE_AESNI)
 #include "aesni.h"
@@ -944,39 +945,44 @@ void prg_2_lambda(const uint8_t* key, const uint8_t* iv, uint32_t tweak, uint8_t
   memcpy(internal_iv, iv, IV_SIZE);
   add_to_upper_word(internal_iv, tweak);
 
-#if defined(HAVE_AESNI)
-// use AES-NI if possible
-#if defined(HAVE_AVX2)
-  if (CPU_SUPPORTS_AESNI_AVX2) {
-    switch (seclvl) {
-    case 256:
-      prg_2_aesni_avx_256(key, internal_iv, out);
-      return;
-    case 192:
-      prg_2_aesni_avx_192(key, internal_iv, out);
-      return;
-    default:
-      prg_2_aesni_avx_128(key, internal_iv, out);
-      return;
-    }
-  }
-#endif
+//   printf("prg_2_lambda:::\n");
 
-  if (CPU_SUPPORTS_AESNI) {
-    switch (seclvl) {
-    case 256:
-      prg_2_aesni_256(key, internal_iv, out);
-      return;
-    case 192:
-      prg_2_aesni_192(key, internal_iv, out);
-      return;
-    default:
-      prg_2_aesni_128(key, internal_iv, out);
-      return;
-    }
-  }
-#endif
+// #if defined(HAVE_AESNI)
+// printf("HAVE_AESNI = TRUE\n");
+// // use AES-NI if possible
+// #if defined(HAVE_AVX2)
+//   printf("HAVE_AVX2 = TRUE\n");
+//   if (CPU_SUPPORTS_AESNI_AVX2) {
+//     switch (seclvl) {
+//     case 256:
+//       prg_2_aesni_avx_256(key, internal_iv, out);
+//       return;
+//     case 192:
+//       prg_2_aesni_avx_192(key, internal_iv, out);
+//       return;
+//     default:
+//       prg_2_aesni_avx_128(key, internal_iv, out);
+//       return;
+//     }
+//   }
+// #endif
 
+//   if (CPU_SUPPORTS_AESNI) {
+//     switch (seclvl) {
+//     case 256:
+//       prg_2_aesni_256(key, internal_iv, out);
+//       return;
+//     case 192:
+//       prg_2_aesni_192(key, internal_iv, out);
+//       return;
+//     default:
+//       prg_2_aesni_128(key, internal_iv, out);
+//       return;
+//     }
+//   }
+// #endif
+
+//   printf("using generic prg\n");
   generic_prg(key, internal_iv, out, seclvl, seclvl * 2 / 8);
 }
 
